@@ -5,6 +5,7 @@ description = "A python library for Single Molecule Localization Microscopy."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "corelp",
     "pytest>=8.4.1",
     "sphinx>=8.2.3",
     "sphinx-rtd-theme>=3.0.2",
@@ -20,3 +21,6 @@ build-backend = "uv_build"
 
 ["tool.uv"]
 required-environments = [ "sys_platform == 'linux' and platform_machine == 'x86_64'", "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",]
+
+[tool.uv.sources]
+corelp = { workspace = true }
