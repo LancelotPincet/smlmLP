@@ -90,6 +90,7 @@ Anaconda tools (Spyder and Jupyter)
 If you are using *Anaconda*, you probably are coding via *Spyder* and *Jupyter*. By default, these use the *root environment* of Anaconda with lots of packages pre-included (but not *smlmLP*!).
 
 The **first option** is to manually launch a kernel with the *.venv* we created before on your *Anaconda Spyder/Jupyter*.
+
 - Spyder: ``Preferences → Python Interpreter`` and select ``./.venv/Scripts/python.exe``
 - Jupyter: ``ipykernel`` must be installed in *.venv* (``uv add jupyter ipykernel``), then ``Kernel → Change Kernel``
 This first option can be tedious every day.
