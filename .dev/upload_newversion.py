@@ -21,6 +21,18 @@ from pathlib import Path
 def main() :
     print('\nRunning upload_newversion :')
 
+    # Warning
+    print('     smlmLP newest version is about to be put online.')
+    stop_upload = True
+    upload = input("     Are you sure you want to upload smlmLP new version? y/[n] >>> ")
+    if str(upload).lower() in ['yes', 'y', 'true', '1'] :
+        upload = input("     This will be definitive are you sure? y/[n] >>> ")
+        if str(upload).lower() in ['yes', 'y', 'true', '1'] :
+            stop_upload = False
+    if stop_upload :
+        print('Upload cancelled by user.')
+        return None
+
     # Push subtree
     subprocess.run(["git", "subtree", "push", "--prefix=libsLP/smlmLP", "smlmLP", "main"], cwd=path.parent, stdout=subprocess.PIPE, text=True)
     print('     pushed newversion to individual repository')
