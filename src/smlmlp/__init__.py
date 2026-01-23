@@ -23,6 +23,8 @@ from contextlib import contextmanager
 def resources_dir():
     with resources.as_file(resources.files("smlmlp.resources")) as path:
         yield path
+if False: 
+    import smlmlp.resources
 
 # %% Hidden imports
 if False :
