@@ -11,10 +11,16 @@ A python library for Single Molecule Localization Microscopy.
 
 
 
-# %% Source code
+# %% Source import
 sources = {
 
 }
+
+
+
+# %% Hidden imports
+if False :
+
 
 
 
