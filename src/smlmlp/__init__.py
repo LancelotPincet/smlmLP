@@ -13,7 +13,7 @@ A python library for Single Molecule Localization Microscopy.
 
 # %% Source import
 sources = {
-
+'Locs': 'smlmlp.modules.Locs_LP.Locs'
 }
 
 
