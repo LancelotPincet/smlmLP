@@ -14,14 +14,14 @@ This class define objects corresponding to localizations sets for one experiment
 
 # %% Libraries
 from corelp import prop, selfkwargs, folder
-from smlmlp import open_locs, save_df, save_metadata
+from smlmlp import open_locs, save_df, save_metadata, LocsDataFrame, dataframes, columns
 from pathlib import Path
 import pandas as pd
 
 
 
 # %% Class
-class Locs() :
+class Locs(LocsDataFrame) :
     '''
     This class define objects corresponding to localizations sets for one experiment.
     
@@ -57,6 +57,7 @@ class Locs() :
 
     # Initialize with any object
     def __init__(self, locs=None, /, **kwargs) :
+        super().__init__()
 
         #Changes attributes from kwargs values
         selfkwargs(self,kwargs)
@@ -104,6 +105,17 @@ class Locs() :
         # Saving metadata
         mainpath = saving_folder / f'{stem}_[metadata].json'
         save_metadata(self, mainpath)
+
+
+
+# Add dataframe property
+for name, dataframe in dataframes.items() :
+    @prop(cache=True)
+    def get_df(self, name=name) :
+        if name == 'locs' :
+            return dataframe(locs=None)
+        return dataframe(locs=self)
+    setattr(Locs, dataframe.__name__, get_df)
 
 
 

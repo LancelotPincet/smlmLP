@@ -51,17 +51,3 @@ def open_df(df) :
     self.df = _df
 
 
-
-def open_file(self, path) :
-    path = Path(path)
-    saving_path = filepath(path, extension='')
-    if saving_path.is_dir() : #Opens folder
-        dfs = opens(saving_path, extension='.csv', key=saving_path.stem, index_col=0) #Opens csv files from folder
-        self.open_data(dfs)
-        metadata = opens(saving_path, extension='.json', key=saving_path.stem)
-        self.open_data(metadata)
-    else :
-        newdata = opens(path, index_col=0)
-        self.open_data(newdata)
-
-
