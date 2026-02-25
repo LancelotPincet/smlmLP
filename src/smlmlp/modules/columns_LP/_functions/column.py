@@ -6,7 +6,7 @@
 
 
 # %% Libraries
-from smlmlp import columns, DataFrame, LocsDataFrame
+from smlmlp import columns, DataFrame, MainDataFrame, LocsDataFrame
 import numpy as np
 
 
@@ -35,9 +35,8 @@ class column() :
 
 
 
-    def __init__(self, *, dtype, headers, save=True, index=False, agg='mean'):
+    def __init__(self, *, headers, save=True, index=False, agg='mean'):
         ''' First called, bracket of decorator '''
-        self.dtype = dtype
         self.headers = headers #List of possible headers, first is default one
         self.header = headers[0]
         self.save = save #True to save this column in files
@@ -52,6 +51,7 @@ class column() :
         #Get column info
         self.func = func #Default behavior function
         self.col = func.__name__ #column shortcut name
+        self.dtype = func.__annotations__['self'] # dtype of column
 
         #Updating columns dictionnaries
         if self.col in columns: raise SyntaxError(f"Column {self.col} is defined twice")
@@ -67,11 +67,15 @@ class column() :
     def __set_name__(self, cls, name):
         ''' Called when assigned to a class '''
         self.cls = cls
-        if self.index : self.cls.set_index(self.col, inplace=True)
+        if self.index :
+            self.df_name = f'{self.header}s'
+            if self.df_name != self.cls.__name__ :
+                raise SyntaxError(f'Index column {self.col} does not coincide with DataFrame name {self.cls.__name__}')
+            self.cls.index_name = self.header
 
         # Assign column list
-        if not hasattr(self.cls, "columns_list") : self.cls.columns_list = []
-        self.cls.columns_list.append(self)
+        if not hasattr(self.cls, "columns_list") : self.cls.columns_dict = {}
+        self.cls.columns_dict[self.col] = self
 
         # Get column object from dataframe instance
         @property
@@ -79,32 +83,72 @@ class column() :
             return self
         setattr(self.cls, f'_{self.col}', _col)
 
-        # Set on LocsDataFrame
-        if self.cls is LocsDataFrame :
+        # Set on MainDataFrame
+        if issubclass(self.cls, MainDataFrame) :
             @property
             def merged_col(df) :
                 if self.header not in df.columns :
-                    locs = df.locs
-                    df[self.header] = locs.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
+                    dets = df.locs.detections
+                    df[self.header] = dets.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
                 return df[self.header].to_numpy()
+            if hasattr(DataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in DataFrame')
             setattr(DataFrame, self.col, merged_col)
         
         # Set on DataFrame
         else :
-            @property
-            def spread_col(locs) :
-                if self.header not in df.columns :
-                    df = getattr(locs, self.cls.__name__)
-                    locs[self.header] = locs[df.index.name].map(df).to_numpy()
-                return locs[self.header].to_numpy()
-            setattr(LocsDataFrame, self.col, merged_col)
+            if self.index :
+                @property
+                def index_col(dets) :
+                    if self.header not in dets.columns :
+                        raise SyntaxError(f'{self.header} is not on locs dataframe')
+                    return dets[self.header].to_numpy()
+                @index_col.setter
+                def index_col(dets, value) :
+                    if value is None :
+                        dets.drop(columns=[self.header], inplace=True)
+                        dets.df_dict.pop(self.df_name)
+                    else :
+                        array = np.asarray(value, dtype=self.dtype)
+                        dets[self.header] = array
+                if hasattr(MainDataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in MainDataFrame')
+                setattr(MainDataFrame, self.col, index_col)
+                @property
+                def get_df(locs) :
+                    if self.df_name not in locs.df_dict :
+                        from smlmlp import dataframes
+                        locs.df_dict[self.df_name] = dataframes[self.df_name](locs)
+                    return locs.df_dict[self.df_name]
+                if hasattr(LocsDataFrame, self.df_name) : raise SyntaxError(f'{self.df_name} cannot be defined twice in LocsDataFrame')
+                setattr(LocsDataFrame, self.df_name, get_df)
+                @property
+                def len_df(locs) :
+                    df = getattr(locs, self.df_name)
+                    return len(df)
+                if hasattr(LocsDataFrame, f'n{self.df_name}') : raise SyntaxError(f'n{self.df_name} cannot be defined twice in LocsDataFrame')
+                setattr(LocsDataFrame, f'n{self.df_name}', len_df)
+            else :
+                @property
+                def spread_col(dets) :
+                    if self.header not in dets.columns :
+                        df = getattr(dets.locs, self.cls.__name__)
+                        dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
+                    return dets[self.header].to_numpy()
+                if hasattr(MainDataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in LocsDataFrame')
+                setattr(MainDataFrame, self.col, spread_col)
                 
 
 
     def __get__(self, instance, cls):
+        # Good practice getter
+        if instance is None:
+            return self
+
+        # Index
+        if self.index :
+            return instance.index.to_numpy()
 
         # Gets from dataframe
-        if self.col in instance.columns :
+        if self.header in instance.columns :
             return instance[self.header].to_numpy()
 
         # Automatic calculation
@@ -124,10 +168,16 @@ class column() :
 
     def __set__(self, instance, value):
         
+        # Index
+        if self.index :
+            if value is None : raise SyntaxError('Setting Dataframe index to None is not possible')
+            return instance.index.to_numpy()
+
         #Removing column from dataframe (value=None)
         if value is None :
             instance.drop(columns=[self.header], inplace=True)
 
         #Setting column
         array = np.asarray(value, dtype=self.dtype)
-        df[self.header] = array
+        instance[self.header] = array
+

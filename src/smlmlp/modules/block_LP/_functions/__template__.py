@@ -6,6 +6,14 @@
 
 
 # %% Libraries
-class LocsDataFrame() :
-    ''' Parent Locs class which receives dataframes properties '''
-    pass
+
+
+
+
+# %% Function
+def temp(**kwargs) :
+    '''
+    TODO
+    '''
+
+    print('Hello world!')

@@ -13,10 +13,11 @@ This class define objects corresponding to localizations sets for one experiment
 
 
 # %% Libraries
-from corelp import prop, selfkwargs, folder
-from smlmlp import open_locs, save_df, save_metadata, LocsDataFrame, dataframes, columns
+from corelp import folder
+from smlmlp import open_df, save_df, LocsDataFrame, DetsDataFrame
 from pathlib import Path
 import pandas as pd
+import numpy as np
 
 
 
@@ -24,7 +25,7 @@ import pandas as pd
 class Locs(LocsDataFrame) :
     '''
     This class define objects corresponding to localizations sets for one experiment.
-    
+
     Parameters
     ----------
     a : int or float
@@ -44,11 +45,11 @@ class Locs(LocsDataFrame) :
 
 
     # Creates Locs objects
-    def __new__(cls, locs=None, /, **kwargs) :
+    def __new__(cls, source=None, /, **kwargs) :
 
         #If Locs object is given as input returns it directly
-        if isinstance(locs, cls) :
-            return locs
+        if isinstance(source, cls) :
+            return source
 
         #Creates a new Locs object
         return object.__new__(cls)
@@ -56,17 +57,50 @@ class Locs(LocsDataFrame) :
 
 
     # Initialize with any object
-    def __init__(self, locs=None, /, **kwargs) :
-        super().__init__()
+    df_dict = None
+    def __init__(self, source=None, config=None) :
+        self.df_dict = dict(detections=DetsDataFrame(self))
 
         #Changes attributes from kwargs values
-        selfkwargs(self,kwargs)
-        if isinstance(locs, Locs) :
+        if isinstance(source, Locs) :
             return #break if already a Locs object
 
         #Opening data
-        if locs is not None :
-            open_locs(self, locs)
+        if source is not None :
+            open(self, source)
+    @property
+    def detections(self) :
+        return self.df_dict['detections']
+
+
+
+    def filter(self, *filter_names, mask=None) :
+        #Get filter mask
+        filters = [getattr(self, name, None) for name in filter_names]
+        if mask is not None :
+            filters += [mask]
+        mask = np.logical_and.reduce(filters)
+        df = self.df[mask].drop(columns=[self.col2head[name] for name in filter_names])
+
+        #filter all dataframe where mask can be spread
+        dfs = [df]
+        name = self._df
+        supname = self._df
+        subname = self.df2subdf[supname]
+        while supname != subname :
+            self.df = subname
+            if self.df is None :
+                break
+            self.index = self.df2index[supname]
+            mask = spread(mask, self.index, desorting=self.desorting, unique=self.unique, counts=self.counts, cumsum=self.cumsum, resort=self.resort)
+            df = self.df[mask]
+            supname = subname
+            subname = self.df2subdf[supname]
+            dfs.append(df)
+
+        cls = self.__class__
+        self.df, self.index = name, None
+        return cls(dfs, **self.metadata, _df=self._df, parent=self)
 
 
 
@@ -105,17 +139,6 @@ class Locs(LocsDataFrame) :
         # Saving metadata
         mainpath = saving_folder / f'{stem}_[metadata].json'
         save_metadata(self, mainpath)
-
-
-
-# Add dataframe property
-for name, dataframe in dataframes.items() :
-    @prop(cache=True)
-    def get_df(self, name=name) :
-        if name == 'locs' :
-            return dataframe(locs=None)
-        return dataframe(locs=self)
-    setattr(Locs, dataframe.__name__, get_df)
 
 
 

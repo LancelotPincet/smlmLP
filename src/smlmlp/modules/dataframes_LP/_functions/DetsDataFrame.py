@@ -6,6 +6,5 @@
 
 
 # %% Libraries
-class LocsDataFrame() :
-    ''' Parent Locs class which receives dataframes properties '''
-    pass
+from smlmlp import dataframes
+DetsDataFrame = dataframes['detections']

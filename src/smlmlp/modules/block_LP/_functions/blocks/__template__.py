@@ -6,6 +6,15 @@
 
 
 # %% Libraries
-class LocsDataFrame() :
-    ''' Parent Locs class which receives dataframes properties '''
-    pass
+from smlmlp import block
+
+
+
+# %% Function
+@block()
+def temp(**kwargs) :
+    '''
+    TODO
+    '''
+
+    print('Hello world!')

@@ -4,7 +4,7 @@ version = "0.1.12"
 description = "A python library for Single Molecule Localization Microscopy."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [ "corelp", "pandas",]
+dependencies = [ "arrlp", "corelp", "numpy", "pandas", "stacklp", "tifffile",]
 
 [build-system]
 requires = [ "uv_build",]
@@ -18,5 +18,11 @@ anaconda = [ "ipykernel", "spyder-kernels",]
 [tool.uv]
 required-environments = [ "sys_platform == 'linux' and platform_machine == 'x86_64'", "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",]
 
+[tool.uv.sources.arrlp]
+workspace = true
+
 [tool.uv.sources.corelp]
+workspace = true
+
+[tool.uv.sources.stacklp]
 workspace = true

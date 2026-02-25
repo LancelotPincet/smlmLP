@@ -7,20 +7,19 @@
 
 # %% Libraries
 import pandas as pd
-import numpy as np
 
 
 
 # %% Function
-class DataFrame(pd.DataFrame) :
+class MainDataFrame(pd.DataFrame) : # This class is here to host dynamic main dataframe columns functions
     '''
-    Localization dimensional dataframe
+    Localization main dataframe
     '''
 
     def __init__(self, locs) :
         if self.index_name is None : raise SyntaxError(f'DataFrame {self.__class__} should have an index name defined via @column decorator')
         self.locs = locs
-        pd.DataFrame.__init__(self, index=np.sort(self.locs.detections[self.index_name].unique()))
+        pd.DataFrame.__init__(self)
         self.index.name = self.index_name
     
     # Attributes
