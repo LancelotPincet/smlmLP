@@ -29,6 +29,8 @@ def metadatum(group, unit=None, type=None, ui=None):
         def setter(self, value):
             if type is not None :
                 value = type(value)
+            if isinstance(ui, list) :
+                if value not in ui : raise SyntaxError(f'{value} is not in {ui}')
             setattr(self, f'_{datum}', value)
 
         #Deleter

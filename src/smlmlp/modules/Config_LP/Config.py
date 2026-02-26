@@ -151,21 +151,28 @@ class Config() :
         return self.yshape * self.xpixel * 1e-3
     
 
+    # 
+    @metadatum(unit='ypix, xpix')
+    def cropshape(self) :
+        return (int(round(self.PSF_field/self.ypixel)), int(round(self.PSF_field/self.xpixel)))
 
-    #PSF
+
+
+    # PSF
     @metadatum('PSF', unit='nm')
     def wavelength(self) : # Fluorescence wavelength [nm]
         return 671.
     @metadatum('PSF')
     def NA(self) : # Objective Numerical Aperture
         return 1.5
-    @metadatum('PSF', ui={'air': 1., 'water': 1.33, 'glycerol': 1.4, 'silicon': 1.4, 'oil': 1.515})
+    @metadatum('PSF', ui=['air', 'water', 'glycerol', 'silicon', 'oil'])
     def immersion_medium(self) : # Optical_index of immersion_medium
         return 'oil'
     @metadatum('PSF', ui=False)
     def optical_index(self) :
         dic = {'air': 1., 'water': 1.33, 'glycerol': 1.4, 'silicon': 1.4, 'oil': 1.515}
-    @metadatum()
+        return dic[self.immersion_medium]
+    @metadatum('PSF')
     def PSF_fact(self) : # Experimental PSF growth factor
         return 2.
     @property
@@ -179,9 +186,6 @@ class Config() :
         delta_wave = self.immersion_medium * self.wavelength / self.NA**2
         delta_geom = self.immersion_medium * self.pixel / self.NA
         return delta_wave + delta_geom
-    @metadatum(unit='ypix, xpix')
-    def cropshape(self) :
-        return (int(round(self.PSF_field/self.ypixel)), int(round(self.PSF_field/self.xpixel)))
 
 
 
@@ -386,75 +390,6 @@ class Config() :
             if matrix is not None :
                 return True
         return False
-
-
-
-    #Merging
-    @property
-    def nmerges(self) :
-        return np.max(self.channel2merge)+1
-    @metadatum(init=True)
-    def channel2merge(self) : #Defines merges on channel having same shape and pixel size
-        pixels_shapes = np.asarray([(pixel, *shape) for pixel, shape in zip(self.channel_pixels, self.channel_shapes)])
-        unique, inverse = np.unique(pixels_shapes, return_inverse=True, axis=0)
-        return list(inverse)
-    @property
-    def merge2channels(self) : #For each merge, gives channel indices
-        channel2merge = self.channel2merge
-        n = np.max(channel2merge)+1
-        return [[ch for ch, mg in enumerate(channel2merge) if merge==mg] for merge in range(n)]
-
-
-
-    #Merge info
-    @property
-    def merge_shapes(self) :
-        return [self.channel_shapes[idx[0]] for idx in self.merge2channels]
-    @property
-    def merge_sizes(self) :
-        return [(shape[1], shape[0]) for shape in self.merge_shapes]
-    @property
-    def merge_xpixels(self) : #list of pixel sizes for each merge [nm]
-        return [self.channel_xpixels[idx[0]] for idx in self.merge2channels]
-    @property
-    def merge_ypixels(self) : #list of pixel sizes for each merge [nm]
-        return [self.channel_ypixels[idx[0]] for idx in self.merge2channels]
-    @property
-    def merge_pixels(self) :
-        return [np.sqrt(xpix*ypix) for xpix, ypix in zip(self.merge_xpixels, self.merge_ypixels)]
-    @property
-    def merge_cropsizes(self) :
-        return [self.channel_cropsizes[idx[0]] for idx in self.merge2channels]
-    @property
-    def merge_cropshapes(self) :
-        return [(size[1], size[0]) for size in self.merge_cropsizes]
-
-
-
-    @metadatum(unit='nm')
-    def wavelets_sigkernel(self) :
-        return self.PSF_sigma
-    @metadatum()
-    def wavelets_order(self) :
-        return 2
-
-
-
-    #New file lists
-    _newtifs = None
-    @initproperty
-    def newtifs(self) :
-        dic = {}
-        for key, chtype in self.newtifs_types.items :
-            stem = f'{self.fileprefix} [{key}]'
-            n = getattr(self, f'n{chtype}s')
-            if n > 1 :
-                dic[key] = [self.saving_path / f'{stem} [{pos:02}].tif' for pos in range(n)]
-            else :
-                dic[key] = [self.saving_path / f'{stem}.tif']
-    @metadatum(init=True)
-    def newtifs_types(self) :
-        return {} #name : chtype
 
 
 

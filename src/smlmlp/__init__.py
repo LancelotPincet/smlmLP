@@ -24,9 +24,9 @@ sources = {
 'load_data': 'smlmlp.modules.block_LP._functions.blocks.load_data',
 'column': 'smlmlp.modules.columns_LP._functions.column',
 'LocsDataFrame': 'smlmlp.modules.dataframes_LP._functions.LocsDataFrame',
-'MainDataFrame': 'smlmlp.modules.dataframes_LP._functions.MainDataFrame',
 'DetsDataFrame': 'smlmlp.modules.dataframes_LP._functions.DetsDataFrame',
-'DataFrame': 'smlmlp.modules.dataframes_LP._functions.DataFrame'
+'DataFrame': 'smlmlp.modules.dataframes_LP._functions.DataFrame',
+'MainDataFrame': 'smlmlp.modules.dataframes_LP._functions.MainDataFrame'
 }
 
 
