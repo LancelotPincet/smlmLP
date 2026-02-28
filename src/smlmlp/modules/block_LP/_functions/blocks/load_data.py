@@ -17,20 +17,30 @@ import numpy as np
 
 # %% Function
 @block()
-def load_data(*tif_paths, chunk=None, pad=0, iterator=range) :
+def load_data(*tif_paths, chunk=None, pad=0, channels=None, nfiles=None, iterator=range) :
     '''
-    This generator loads SMLM raw data in chunks from various tif files. 
+    This generator loads SMLM raw data in chunks from various tif files.
     '''
 
     with ExitStack() as stack :
         block.times = {} # Reset timings of blocks
         tifs = [stack.enter_context(tiff.TiffFile(file)) for file in tif_paths]
         shapes = [shapetif(tif) for tif in tifs]
+        _nfiles = len(tifs)
+        if nfiles is None : nfiles = _nfiles
+        if nfiles != _nfiles : raise ValueError(f'Number of files to load {_nfiles} is not the one expected {nfiles}')
+        if nchannels is None : nchannels = nfiles
+        if nfiles < 1 : raise SyntaxError('Must define at least one tiff file to load')
+        if nchannels < nfiles : raise ValueError('Cannot have more files to load than channels')
+        if pixels is None : pixels = [100. for _ in range(nchannels)]
+        if len(pixels) != nfiles : raise ValueError(f'There is not the same number of pixel sizes defined ({len(pixels)}) as files ({nfiles})')
 
         # Check number of frames
         nframes = None
         for shape in shapes :
             if nframes is None : nframes = shape[0]
+            if len(shape) != 3 :
+                raise ValueError(f'Tiff files for SMLM data should have 3 dimensions (time, y, x), not {shape}')
             if shape[0] != nframes :
                 raise ValueError('All tiff files do not have the same number of frames which is not possible for a single SMLM acquisition')
 
@@ -62,10 +72,15 @@ def load_data(*tif_paths, chunk=None, pad=0, iterator=range) :
             pad10, pad11 = chunk1 + 1, chunk1 + pad
             borders = dict(chunk0=chunk0, chunk1=chunk1, pad00=pad00, pad01=pad01, pad10=pad10, pad11=pad11)
 
-            # Load
+
+
+            # --- Load ---
+
+
+
             for tif, load in zip(tifs, loads) :
                 
-                #Defining views
+                # Defining views
                 array_pad0 = load[:pad]
                 array_chunk = load[-pad-chunk:len(load)-pad]
                 array_pad1 = load[len(load)-pad:]
@@ -74,19 +89,19 @@ def load_data(*tif_paths, chunk=None, pad=0, iterator=range) :
                 if pad > 0 and loop == 0 :
                     tif.asarray(key=slice(0, pad, 1), out=array_pad1)
 
-                #Transfering already loaded data
+                # Transfering already loaded data
                 if pad > 0 :
                     np.copyto(array_pad0, array_chunk[-pad:])
                     np.copyto(array_chunk[:pad,:,:], array_pad1)
 
-                #Loading chunk data
+                # Loading chunk data
                 pos0 = min(chunk1 + pad - chunk + 1, nframes)
                 pos1 = min(chunk1 + 1, nframes)
                 delta = pos1 - pos0
                 if pos0 < nframes :
                     tif.asarray(key=slice(pos0, pos1, 1), out=array_chunk[pad:pad+delta,:,:])
 
-                #Loading pad1 data
+                # Loading pad1 data
                 if pad > 0 :
                     pos0 = min(pad10, nframes)
                     pos1 = min(pad11 + 1, nframes)
@@ -94,7 +109,52 @@ def load_data(*tif_paths, chunk=None, pad=0, iterator=range) :
                     if pos0 < nframes :
                         tif.asarray(key=slice(pos0, pos1, 1), out=array_pad1[:delta,:,:])
 
-            #Slicing if end of acquisition
+            # Slicing if end of acquisition
             if pad11 + 1 > nframes :
                 loads = [load[:nframes - pad11 - 1] for load in loads]
-            yield loads, borders
+
+
+
+            # --- Dividing loads arrays into channels ---
+
+
+
+            if nchannels == nfiles :
+                yield [load[:] for load in loads], borders # New list instance // case nchannels == 1 included here
+            
+            elif nchannels == 2 and nfiles == 1 :
+                channels = [ # slice along x dimension (fast sCMOS direction), you want two lines in the two channels to correspond to same time
+                    loads[0][:, :, :shapes[0][1]//2], # left
+                    loads[0][:, :, -shapes[0][1]//2:], # right
+                    ]
+
+            elif nchannels == 4 and nfiles == 1 :
+                channels = [ # slice 4 quadrants of the camera
+                    loads[0][:, :shapes[0][0]//2, :shapes[0][1]//2], # top left
+                    loads[0][:, :shapes[0][0]//2, -shapes[0][1]//2:], # top right
+                    loads[0][:, -shapes[0][0]//2:, :shapes[0][1]//2], # bottom left
+                    loads[0][:, -shapes[0][0]//2:, -shapes[0][1]//2:], # bottom right
+                    ]
+
+            elif nchannels == 4 and nfiles == 2 :
+                channels = [ # slice along x dimension in the two files
+                    loads[0][:, :, :shapes[0][1]//2], # left 0
+                    loads[0][:, :, -shapes[0][1]//2:], # right 0
+                    loads[1][:, :, :shapes[1][1]//2], # left 1
+                    loads[1][:, :, -shapes[1][1]//2:], # right 1
+                    ]
+
+            elif nchannels == 5 and nfiles == 2 :
+                channels = [ # slice 4 quadrants of the main camera, and central field in secondary camera
+                    loads[0][:, :shapes[0][0]//2, :shapes[0][1]//2], # top left
+                    loads[0][:, :shapes[0][0]//2, -shapes[0][1]//2:], # top right
+                    loads[0][:, -shapes[0][0]//2:, :shapes[0][1]//2], # bottom left
+                    loads[0][:, -shapes[0][0]//2:, -shapes[0][1]//2:], # bottom right
+                    loads[1][:, ??], # bottom right
+                    ]
+
+            else :
+                raise SyntaxError(f'The combination of {nchannels} channel extraction from {nfiles} files is not supported, please contact authors to implement it.')
+
+            # Return the generator value
+            yield *channels, borders

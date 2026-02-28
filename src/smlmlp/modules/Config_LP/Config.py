@@ -96,7 +96,7 @@ class Config() :
 
 
 
-    # Pixel
+    # Cameras
     @metadatum("Pixel size", unit='µm')
     def xpixel_cam(self) :
         return 6.5
