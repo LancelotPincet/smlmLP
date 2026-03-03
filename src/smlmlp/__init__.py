@@ -14,14 +14,12 @@ A python library for Single Molecule Localization Microscopy.
 # %% Source import
 sources = {
 'Config': 'smlmlp.modules.Config_LP.Config',
-'Hardware': 'smlmlp.modules.Hardware_LP.Hardware',
 'Locs': 'smlmlp.modules.Locs_LP.Locs',
 'block': 'smlmlp.modules.block_LP.block',
 'columns': 'smlmlp.modules.columns_LP.columns',
 'dataframes': 'smlmlp.modules.dataframes_LP.dataframes',
+'Camera': 'smlmlp.modules.Config_LP._functions.Camera',
 'metadatum': 'smlmlp.modules.Config_LP._functions.metadatum',
-'Camera': 'smlmlp.modules.Hardware_LP._functions.Camera',
-'Objectives': 'smlmlp.modules.Hardware_LP._functions.Objectives',
 'save_df': 'smlmlp.modules.Locs_LP._functions.save_df',
 'open_df': 'smlmlp.modules.Locs_LP._functions.open_df',
 'load_data': 'smlmlp.modules.block_LP._functions.blocks.load_data',

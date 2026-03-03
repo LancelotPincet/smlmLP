@@ -14,6 +14,5 @@ Here are the references to the various modules to import in **smlmLP**.
    dataframes
    columns
    block
-   Hardware
    Config
    Locs

@@ -17,7 +17,7 @@ import numpy as np
 
 # %% Function
 @block()
-def load_data(*tif_paths, chunk=None, pad=0, channels=None, nfiles=None, iterator=range) :
+def load_data(*tif_paths, chunk=None, pad=0, bboxes=None, nfiles=None, iterator=range) :
     '''
     This generator loads SMLM raw data in chunks from various tif files.
     '''
@@ -29,11 +29,10 @@ def load_data(*tif_paths, chunk=None, pad=0, channels=None, nfiles=None, iterato
         _nfiles = len(tifs)
         if nfiles is None : nfiles = _nfiles
         if nfiles != _nfiles : raise ValueError(f'Number of files to load {_nfiles} is not the one expected {nfiles}')
-        if nchannels is None : nchannels = nfiles
         if nfiles < 1 : raise SyntaxError('Must define at least one tiff file to load')
+        if bboxes is None : bboxes = [[(0, 0, shape[2], shape[1]),] for shape in shapes]
+        nchannels = [len(bbox) for bbox in bboxes]
         if nchannels < nfiles : raise ValueError('Cannot have more files to load than channels')
-        if pixels is None : pixels = [100. for _ in range(nchannels)]
-        if len(pixels) != nfiles : raise ValueError(f'There is not the same number of pixel sizes defined ({len(pixels)}) as files ({nfiles})')
 
         # Check number of frames
         nframes = None
@@ -119,42 +118,16 @@ def load_data(*tif_paths, chunk=None, pad=0, channels=None, nfiles=None, iterato
 
 
 
-            if nchannels == nfiles :
-                yield [load[:] for load in loads], borders # New list instance // case nchannels == 1 included here
-            
-            elif nchannels == 2 and nfiles == 1 :
-                channels = [ # slice along x dimension (fast sCMOS direction), you want two lines in the two channels to correspond to same time
-                    loads[0][:, :, :shapes[0][1]//2], # left
-                    loads[0][:, :, -shapes[0][1]//2:], # right
-                    ]
+            # Make channel views
+            channels = []
+            for load, bbox in zip(loads, bboxes) :
+                for bb in bbox :
+                    # bb = (x0, y0, x1, y1) slicing --> [y0:y1, x0:x1]
+                    x0, y0, x1, y1 = bb
+                    channel = load[:, y0:y1, x0:x1]
+                    channels.append(channel)
 
-            elif nchannels == 4 and nfiles == 1 :
-                channels = [ # slice 4 quadrants of the camera
-                    loads[0][:, :shapes[0][0]//2, :shapes[0][1]//2], # top left
-                    loads[0][:, :shapes[0][0]//2, -shapes[0][1]//2:], # top right
-                    loads[0][:, -shapes[0][0]//2:, :shapes[0][1]//2], # bottom left
-                    loads[0][:, -shapes[0][0]//2:, -shapes[0][1]//2:], # bottom right
-                    ]
 
-            elif nchannels == 4 and nfiles == 2 :
-                channels = [ # slice along x dimension in the two files
-                    loads[0][:, :, :shapes[0][1]//2], # left 0
-                    loads[0][:, :, -shapes[0][1]//2:], # right 0
-                    loads[1][:, :, :shapes[1][1]//2], # left 1
-                    loads[1][:, :, -shapes[1][1]//2:], # right 1
-                    ]
-
-            elif nchannels == 5 and nfiles == 2 :
-                channels = [ # slice 4 quadrants of the main camera, and central field in secondary camera
-                    loads[0][:, :shapes[0][0]//2, :shapes[0][1]//2], # top left
-                    loads[0][:, :shapes[0][0]//2, -shapes[0][1]//2:], # top right
-                    loads[0][:, -shapes[0][0]//2:, :shapes[0][1]//2], # bottom left
-                    loads[0][:, -shapes[0][0]//2:, -shapes[0][1]//2:], # bottom right
-                    loads[1][:, ??], # bottom right
-                    ]
-
-            else :
-                raise SyntaxError(f'The combination of {nchannels} channel extraction from {nfiles} files is not supported, please contact authors to implement it.')
 
             # Return the generator value
             yield *channels, borders
