@@ -6,16 +6,14 @@
 
 
 # %% Libraries
-from smlmlp import block
-import numpy as np
+
 
 
 
 # %% Function
-@block()
-def myblock(*args, iterator=range) :
+def temp(**kwargs) :
     '''
-    TODO.
+    TODO
     '''
 
-    return
+    print('Hello world!')

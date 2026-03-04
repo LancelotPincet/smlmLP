@@ -15,4 +15,5 @@ Here are the references to the various modules to import in **smlmLP**.
    columns
    block
    Config
+   computer
    Locs

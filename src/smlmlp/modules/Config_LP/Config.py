@@ -127,6 +127,10 @@ class Config() :
         FOV = self.FOV_max
         return [camera.FOV2bbox(FOV) for camera in self.cameras]
 
+    @property
+    def frame_bytes(self) : # gigabytes/frame
+        return sum([camera.frame_bytes for camera in self.cameras])
+    
 
     # Loads
 

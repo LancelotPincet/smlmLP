@@ -17,7 +17,7 @@ import numpy as np
 
 # %% Function
 @block()
-def load_data(*tif_paths, chunk=None, pad=0, bboxes=None, nfiles=None, iterator=range) :
+def load_data(*tif_paths, chunk=None, pad=0, bbox=None, iterator=range) :
     '''
     This generator loads SMLM raw data in chunks from various tif files.
     '''
@@ -26,13 +26,11 @@ def load_data(*tif_paths, chunk=None, pad=0, bboxes=None, nfiles=None, iterator=
         block.times = {} # Reset timings of blocks
         tifs = [stack.enter_context(tiff.TiffFile(file)) for file in tif_paths]
         shapes = [shapetif(tif) for tif in tifs]
-        _nfiles = len(tifs)
-        if nfiles is None : nfiles = _nfiles
-        if nfiles != _nfiles : raise ValueError(f'Number of files to load {_nfiles} is not the one expected {nfiles}')
+        nfiles = len(tifs)
         if nfiles < 1 : raise SyntaxError('Must define at least one tiff file to load')
-        if bboxes is None : bboxes = [[(0, 0, shape[2], shape[1]),] for shape in shapes]
-        nchannels = [len(bbox) for bbox in bboxes]
-        if nchannels < nfiles : raise ValueError('Cannot have more files to load than channels')
+        if bbox is None : bbox = [[(0, 0, shape[2], shape[1]),] for shape in shapes]
+        nchannels = [len(box) for box in bbox]
+        if len(nchannels) != nfiles : raise ValueError('Did not give the same amount of bbox as files')
 
         # Check number of frames
         nframes = None
@@ -120,8 +118,8 @@ def load_data(*tif_paths, chunk=None, pad=0, bboxes=None, nfiles=None, iterator=
 
             # Make channel views
             channels = []
-            for load, bbox in zip(loads, bboxes) :
-                for bb in bbox :
+            for load, box in zip(loads, bbox) :
+                for bb in box :
                     # bb = (x0, y0, x1, y1) slicing --> [y0:y1, x0:x1]
                     x0, y0, x1, y1 = bb
                     channel = load[:, y0:y1, x0:x1]
@@ -130,4 +128,4 @@ def load_data(*tif_paths, chunk=None, pad=0, bboxes=None, nfiles=None, iterator=
 
 
             # Return the generator value
-            yield *channels, borders
+            yield channels, borders

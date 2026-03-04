@@ -17,6 +17,7 @@ sources = {
 'Locs': 'smlmlp.modules.Locs_LP.Locs',
 'block': 'smlmlp.modules.block_LP.block',
 'columns': 'smlmlp.modules.columns_LP.columns',
+'computer': 'smlmlp.modules.computer_LP.computer',
 'dataframes': 'smlmlp.modules.dataframes_LP.dataframes',
 'Camera': 'smlmlp.modules.Config_LP._functions.Camera',
 'metadatum': 'smlmlp.modules.Config_LP._functions.metadatum',

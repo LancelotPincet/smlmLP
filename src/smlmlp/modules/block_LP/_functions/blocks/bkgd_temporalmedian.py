@@ -13,7 +13,7 @@ import numpy as np
 
 # %% Function
 @block()
-def myblock(*args, iterator=range) :
+def bkgd_temporalmedian(*channels, iterator=range) :
     '''
     TODO.
     '''
