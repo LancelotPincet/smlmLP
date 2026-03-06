@@ -19,17 +19,17 @@ sources = {
 'columns': 'smlmlp.modules.columns_LP.columns',
 'computer': 'smlmlp.modules.computer_LP.computer',
 'dataframes': 'smlmlp.modules.dataframes_LP.dataframes',
-'metadatum': 'smlmlp.modules.Config_LP._functions.metadatum',
 'Camera': 'smlmlp.modules.Config_LP._functions.Camera',
+'metadatum': 'smlmlp.modules.Config_LP._functions.metadatum',
 'save_df': 'smlmlp.modules.Locs_LP._functions.save_df',
 'open_df': 'smlmlp.modules.Locs_LP._functions.open_df',
-'load_data': 'smlmlp.modules.block_LP._functions.blocks.load_data',
 'bkgd_temporalmedian': 'smlmlp.modules.block_LP._functions.blocks.bkgd_temporalmedian',
+'load_data': 'smlmlp.modules.block_LP._functions.blocks.load_data',
 'column': 'smlmlp.modules.columns_LP._functions.column',
 'LocsDataFrame': 'smlmlp.modules.dataframes_LP._functions.LocsDataFrame',
+'MainDataFrame': 'smlmlp.modules.dataframes_LP._functions.MainDataFrame',
 'DetsDataFrame': 'smlmlp.modules.dataframes_LP._functions.DetsDataFrame',
-'DataFrame': 'smlmlp.modules.dataframes_LP._functions.DataFrame',
-'MainDataFrame': 'smlmlp.modules.dataframes_LP._functions.MainDataFrame'
+'DataFrame': 'smlmlp.modules.dataframes_LP._functions.DataFrame'
 }
 
 
