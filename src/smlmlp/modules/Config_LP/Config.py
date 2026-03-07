@@ -131,6 +131,11 @@ class Config() :
     def frame_bytes(self) : # gigabytes/frame
         return sum([camera.frame_bytes for camera in self.cameras])
     
+    @metadatum('Cameras', dtype=float)
+    def exposure(self) : # [ms]
+        return 50.
+
+
 
     # Loads
 
