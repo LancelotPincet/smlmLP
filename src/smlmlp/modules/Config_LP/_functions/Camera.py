@@ -6,8 +6,7 @@
 
 
 # %% Libraries
-from corelp import prop, selfkwargs
-
+from corelp import prop
 
 
 
@@ -18,6 +17,11 @@ class Camera :
     '''
 
     metadata = ["npixels", "bits", "pixel", "nchannels", "ADU", "QE"]
+
+
+
+    def __init__(self, config) :
+        self.config = config
 
 
 
@@ -56,9 +60,17 @@ class Camera :
 
 
     # Channels
-    @prop(dtype=int)
+    @property
+    def channels(self) :
+        if not hasattr(self, '_channels') : self.nchannels = 1
+        return self._channels
+    @property
     def nchannels(self) :
-        return 1
+        return len(self.channels)
+    @nchannels.setter
+    def nchannels(self, value) :
+        from smlmlp import Channel
+        self._channels = [Channel(self) for _ in range(int(value))]
 
     @property
     def FOV_max(self) : # (y, y) [µm]

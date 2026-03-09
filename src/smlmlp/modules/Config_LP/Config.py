@@ -17,7 +17,7 @@ from corelp import prop, selfkwargs
 from pathlib import Path
 import json
 import numpy as np
-from smlmlp import metadatum, Camera
+from smlmlp import metadatum, Camera, Channel
 from contextlib import ExitStack
 import tifffile as tiff
 from stacklp import shapetif
@@ -52,7 +52,6 @@ class Config() :
 
         # Opening tif files
         self.nfiles = len(tif_paths)
-        if self.nfiles == 0 : raise SyntaxError('Configuration object can only be initialized with tif files')
 
         # Loading previous configuration
         if config is not None :
@@ -63,21 +62,22 @@ class Config() :
                         config = json.load(file)
                 else :
                     raise SyntaxError(f'config path was not recognized: {config}')
-            for group_name, group_dict in config.items() :
+            for group_dict in config.values() :
                 selfkwargs(self, group_dict)
         selfkwargs(self, kwargs)
 
         # Opening files
-        with ExitStack() as stack :
-            tifs = [stack.enter_context(tiff.TiffFile(file)) for file in tif_paths]
-            shapes = [shapetif(tif) for tif in tifs]
+        if len(tif_paths) :
+            with ExitStack() as stack :
+                tifs = [stack.enter_context(tiff.TiffFile(file)) for file in tif_paths]
+                shapes = [shapetif(tif) for tif in tifs]
 
-        # Check number of frames
-        for shape in shapes :
-            if shape[0] != shapes[0][0] :
-                raise ValueError('All tiff files do not have the same number of frames which is not possible for a single SMLM acquisition')
-        self.nframes = shapes[0][0]
-        self.npixels = [shape[1:3] for shape in shapes]
+            # Check number of frames
+            for shape in shapes :
+                if shape[0] != shapes[0][0] :
+                    raise ValueError('All tiff files do not have the same number of frames which is not possible for a single SMLM acquisition')
+            self.nframes = shapes[0][0]
+            self.npixels = [shape[1:3] for shape in shapes]
 
 
 
@@ -114,7 +114,7 @@ class Config() :
         return len(self.cameras)
     @nfiles.setter
     def nfiles(self, value) :
-        self.cameras = [Camera() for _ in range(value)]
+        self.cameras = [Camera(self) for _ in range(int(value))]
 
     @property
     def FOV_max(self) :
@@ -137,11 +137,35 @@ class Config() :
 
 
 
+    # Channels
+
+    @property
+    def total_nchannels(self) :
+        return sum(self.nchannels)
+
+    @property
+    def channels(self) :
+        return [channel for camera in self.cameras for channel in camera.channels]
+
+
+
     # Loads
 
     @metadatum('Loads', dtype=int)
     def nframes(self) :
         return 60000
+
+
+
+    # Background configurations
+
+    @metadatum('Backgrounds', dtype=float)
+    def temporal_window(self) : # For temporal median [ms]
+        return 25 * self.exposure
+
+    @metadatum('Backgrounds', dtype=float)
+    def local_sigma(self) : # For local mean [nm]
+        return 15 * self.pixel[0][0]
 
 
 
@@ -152,10 +176,33 @@ for data in Camera.metadata :
         return [getattr(camera, data) for camera in self.cameras]
     @camera_property.setter
     def camera_property(self, value, data=data) :
-        if len(value) != self.nfiles : raise ValueError('Value set does not have same number of elements as cameras')
+        try :
+            if len(value) != self.nfiles : raise ValueError('Value set does not have same number of elements as cameras')
+        except TypeError :
+            value = [value for _ in range(self.nfiles)]            
         for camera, v in zip(self.cameras, value) :
             setattr(camera, data, v)
     setattr(Config, data, camera_property)
+    @property
+    def channel_property(self, data=data) :
+        return [getattr(channel, data) for channel in self.channels]
+    setattr(Config, f'channel_{data}', channel_property)
+    
+# Adding Channel metadata
+for data in Channel.metadata :
+    @metadatum('Channels', name=data)
+    def channel_property(self, data=data) :
+        return [getattr(channel, data) for channel in self.channels]
+    @channel_property.setter
+    def channel_property(self, value, data=data) :
+        try :
+            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
+        except TypeError :
+            value = [value for _ in range(self.total_nchannels)]     
+        for channel, v in zip(self.channels, value) :
+            setattr(channel, data, v)
+    setattr(Config, data, channel_property)
+
 
 
 
