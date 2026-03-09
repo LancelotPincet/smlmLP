@@ -13,7 +13,7 @@ from stacklp import temporal_median
 
 # %% Function
 @block()
-def bkgd_temporalmedian(*channels, temporal_window=25, exposure=1., pad=0, bkgds=None, cuda=False, parallel=False) :
+def bkgd_temporalmedian(channels, temporal_window=25, exposure=1., pad=0, bkgds=None, cuda=False, parallel=False) :
     '''
     This function creates the temporal median background.
     '''

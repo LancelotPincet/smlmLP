@@ -13,7 +13,7 @@ from arrlp import img_gaussianfilter
 
 # %% Function
 @block()
-def bkgd_localmean(*channels, local_sigma=4, pixel=1., pad=0, bkgds=None, cuda=False, parallel=False) :
+def bkgd_localmean(channels, local_sigma=4, pixel=1., pad=0, bkgds=None, cuda=False, parallel=False) :
     '''
     This function creates the temporal median background.
     '''
