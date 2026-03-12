@@ -17,6 +17,7 @@ class Camera :
     '''
 
     metadata = ["npixels", "bits", "pixel", "nchannels", "ADU", "QE"]
+    properties = []
 
 
 

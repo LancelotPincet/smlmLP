@@ -126,11 +126,10 @@ class Config() :
     def bbox(self) :
         FOV = self.FOV_max
         return [camera.FOV2bbox(FOV) for camera in self.cameras]
-
     @property
     def frame_bytes(self) : # gigabytes/frame
         return sum([camera.frame_bytes for camera in self.cameras])
-    
+
     @metadatum('Cameras', dtype=float)
     def exposure(self) : # [ms]
         return 50.
@@ -154,6 +153,51 @@ class Config() :
     @metadatum('Loads', dtype=int)
     def nframes(self) :
         return 60000
+
+
+
+    # Blinking
+
+    @metadatum('Blinks')
+    def psf_sigma(self) :
+        return [channel.psf_sigma for channel in self.channels]
+    @psf_sigma.setter
+    def psf_sigma(self, value) :
+        try :
+            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
+        except TypeError :
+            value = [value for _ in range(self.total_nchannels)]     
+        for channel, v in zip(self.channels, value) :
+            channel.psf_sigma = v
+    
+    @metadatum('Blinks')
+    def psf_eccentricity(self) :
+        return [channel.psf_eccentricity for channel in self.channels]
+    @psf_eccentricity.setter
+    def psf_eccentricity(self, value) :
+        try :
+            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
+        except TypeError :
+            value = [value for _ in range(self.total_nchannels)]     
+        for channel, v in zip(self.channels, value) :
+            channel.psf_eccentricity = v
+    
+    @metadatum('Blinks')
+    def psf_theta(self) :
+        return [channel.psf_theta for channel in self.channels]
+    @psf_theta.setter
+    def psf_theta(self, value) :
+        try :
+            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
+        except TypeError :
+            value = [value for _ in range(self.total_nchannels)]     
+        for channel, v in zip(self.channels, value) :
+            channel.psf_theta = v
+    
+    @metadatum('Blinks')
+    def on_time(self) : # ms
+        return 50.
+
 
 
 
@@ -191,7 +235,28 @@ for data in Camera.metadata :
     def channel_property(self, data=data) :
         return [getattr(channel, data) for channel in self.channels]
     setattr(Config, f'channel_{data}', channel_property)
-    
+
+# Adding Camera properties
+for data in Camera.properties :
+    @property
+    def camera_property(self, data=data) :
+        return [getattr(camera, data) for camera in self.cameras]
+    @camera_property.setter
+    def camera_property(self, value, data=data) :
+        try :
+            if len(value) != self.nfiles : raise ValueError('Value set does not have same number of elements as cameras')
+        except TypeError :
+            value = [value for _ in range(self.nfiles)]            
+        for camera, v in zip(self.cameras, value) :
+            setattr(camera, data, v)
+    setattr(Config, data, camera_property)
+    @property
+    def channel_property(self, data=data) :
+        return [getattr(channel, data) for channel in self.channels]
+    setattr(Config, f'channel_{data}', channel_property)
+
+
+
 # Adding Channel metadata
 for data in Channel.metadata :
     @metadatum('Channels', name=data)
@@ -206,6 +271,22 @@ for data in Channel.metadata :
         for channel, v in zip(self.channels, value) :
             setattr(channel, data, v)
     setattr(Config, data, channel_property)
+
+# Adding Channel properties
+for data in Channel.properties :
+    @property
+    def channel_property(self, data=data) :
+        return [getattr(channel, data) for channel in self.channels]
+    @channel_property.setter
+    def channel_property(self, value, data=data) :
+        try :
+            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
+        except TypeError :
+            value = [value for _ in range(self.total_nchannels)]     
+        for channel, v in zip(self.channels, value) :
+            setattr(channel, data, v)
+    setattr(Config, data, channel_property)
+
 
 
 

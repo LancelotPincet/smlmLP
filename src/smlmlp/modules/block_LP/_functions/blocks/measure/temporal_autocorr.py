@@ -7,21 +7,23 @@
 
 # %% Libraries
 from smlmlp import block, Config
-from arrlp import gc, img_gaussianfilter
+from arrlp import gc, get_xp, img_gaussianfilter
 from funclp import Exponential1
 from stacklp import temporal_autocorr as stack_autocorr
+import numpy as np
+from scipy.optimize import curve_fit
 
 
 
 # %% Function
 @block()
-def temporal_autocorr(channels, psf_sigma, crop=None, exposure=1., channel_pixel=1., cuda=False, parallel=False) :
+def temporal_autocorr(channels, crop=None, *, psf_sigma=1., exposure=1., channel_pixel=1., cuda=False, parallel=False) :
     '''
     This function creates the temporal autocorrelation for on time measurements.
     '''
 
     # Optimization parameters
-    xp = get_cuda(cuda)
+    xp = get_xp(cuda)
     parallel = False if cuda else parallel
 
     # Get pixel
@@ -31,9 +33,8 @@ def temporal_autocorr(channels, psf_sigma, crop=None, exposure=1., channel_pixel
     if crop is None: crop = int(len(channels) // 2 - 1)
     T = np.arange(crop)
     t = T * exposure
-    mask = T != 0
 
-    result = {'ac': []}
+    results = {'ac': []}
     for i, (channel, pix) in enumerate(zip(channels, pixel)) :
 
         # Calculating autocorrelation
@@ -47,14 +48,14 @@ def temporal_autocorr(channels, psf_sigma, crop=None, exposure=1., channel_pixel
         ac -= ac[-1]
         ac /= ac[0]
         if cuda : ac = xp.asnumpy(ac)
-        result['ac'].append(ac)
+        results['ac'].append(ac)
 
     # Averaging
     gc()
-    y = np.zeros_like(result['ac'][0])
-    for ac in ac_list :
-        y += (ac / len(result['ac']))
-    result['average'] = y
+    y = np.zeros_like(results['ac'][0])
+    for ac in results['ac'] :
+        y += (ac / len(results['ac']))
+    results['average'] = y
 
     # Fitting
     p0 = [1., -0.5] # tau, offset
@@ -63,8 +64,8 @@ def temporal_autocorr(channels, psf_sigma, crop=None, exposure=1., channel_pixel
     func2fit = lambda t, tau, offset: expodecay(t, tau=tau, offset=offset)
     popt, _ = curve_fit(func2fit, T, y, p0=p0, bounds=bounds)
     tau, offset = popt
-    result['fitted'] = func2fit(T, *popt)
-    result['time'] = t
+    results['fit'] = func2fit(T, *popt)
+    results['time'] = t
     on_time = tau * exposure # ms
 
     return on_time, results
