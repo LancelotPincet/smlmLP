@@ -13,13 +13,13 @@ from stacklp import temporal_median
 
 # %% Function
 @block()
-def bkgd_temporalmedian(channels, temporal_window=25, exposure=1., pad=0, bkgds=None, cuda=False, parallel=False) :
+def temporal_localmedian(channels, localmedian_window=25, exposure=1., pad=0, bkgds=None, cuda=False, parallel=False) :
     '''
     This function creates the temporal median background.
     '''
 
     # Get temporal window in frames
-    temporal_window = int(round(temporal_window / exposure))
+    localmedian_window = int(round(localmedian_window / exposure))
 
     # Correct bkgd length for end of acquisition
     if bkgds is not None and len(bkgds[0]) > len(channels[0]) - 2*pad:
@@ -29,7 +29,7 @@ def bkgd_temporalmedian(channels, temporal_window=25, exposure=1., pad=0, bkgds=
     for i in range(len(channels)) :
         bkgd = None if bkgds is None else bkgds[i]
         channel = channels[i]
-        new_bkgd = temporal_median(channel, temporal_window, out=bkgd, pad=pad, cuda=cuda, parallel=parallel)
+        new_bkgd = temporal_median(channel, localmedian_window, out=bkgd, pad=pad, cuda=cuda, parallel=parallel)
         new_bkgds.append(new_bkgd)
 
     return new_bkgds

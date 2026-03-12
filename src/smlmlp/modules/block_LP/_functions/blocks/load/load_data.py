@@ -8,16 +8,17 @@
 # %% Libraries
 from smlmlp import block
 from contextlib import ExitStack
-import gc
+from arrlp import gc
 import tifffile as tiff
 from stacklp import shapetif
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 
 
 # %% Function
 @block()
-def load_data(*tif_paths, chunk=None, pad=0, bbox=None, iterator=range) :
+def load_data(*tif_paths, chunk=None, pad=0, bbox=None, memmap=True, iterator=range) :
     '''
     This generator loads SMLM raw data in chunks from various tif files.
     '''
@@ -49,14 +50,26 @@ def load_data(*tif_paths, chunk=None, pad=0, bbox=None, iterator=range) :
             pad = nframes - 1
         nloops = int(np.ceil(nframes / chunk))
 
+        # Try memmap
+        if memmap :
+            mmaps = []
+            for tif_path in tif_paths :
+                try :
+                    mmap = tiff.memmap(tif_path)
+                except ValueError :
+                    mmap = None
+                mmaps.append(mmap)
+        else :
+            mmaps = [None for _ in range(nfiles)]
+
         # Allocating memory
         shapes = [shape[1:3] for shape in shapes] # Remove number of frames
         dtypes = [tif.pages.get(0).dtype for tif in tifs] # Get dtype of each file
-        loads = [np.empty(shape=(chunk + 2 * pad, *shape), dtype=dtype) for shape, dtype in zip(shapes, dtypes)]
+        loads = [np.empty(shape=(chunk + 2 * pad, *shape), dtype=dtype) if mmap is None else None for shape, dtype, mmap in zip(shapes, dtypes, mmaps)]
 
         # loops
         for loop in iterator(nloops) :
-            gc.collect()  # Force garbage collection
+            gc()  # Force garbage collection
 
             #             <-- data flux <--          
             # | 00pad01 |     0chunk1     | 10pad11 | BEFORE
@@ -71,44 +84,23 @@ def load_data(*tif_paths, chunk=None, pad=0, bbox=None, iterator=range) :
 
 
 
-            # --- Load ---
+            # Memmaps chunks
+            mmaps_chunks = [mmap[max(0, pad00) : min(pad11 + 1, nframes)] if mmap is not None else None for mmap in mmaps]
 
 
+            # Load
+            with ThreadPoolExecutor(max_workers=nfiles) as pool:
+                futures = [
+                    pool.submit(_load_one_tif, tif, load, loop, chunk, pad, nframes, chunk1, pad10, pad11)
+                    for tif, load, mmap in zip(tifs, loads, mmaps) if mmap is None
+                    ]
 
-            for tif, load in zip(tifs, loads) :
-                
-                # Defining views
-                array_pad0 = load[:pad]
-                array_chunk = load[-pad-chunk:len(load)-pad]
-                array_pad1 = load[len(load)-pad:]
-
-                # First loop scenario
-                if pad > 0 and loop == 0 :
-                    tif.asarray(key=slice(0, pad, 1), out=array_pad1)
-
-                # Transfering already loaded data
-                if pad > 0 :
-                    np.copyto(array_pad0, array_chunk[-pad:])
-                    np.copyto(array_chunk[:pad,:,:], array_pad1)
-
-                # Loading chunk data
-                pos0 = min(chunk1 + pad - chunk + 1, nframes)
-                pos1 = min(chunk1 + 1, nframes)
-                delta = pos1 - pos0
-                if pos0 < nframes :
-                    tif.asarray(key=slice(pos0, pos1, 1), out=array_chunk[pad:pad+delta,:,:])
-
-                # Loading pad1 data
-                if pad > 0 :
-                    pos0 = min(pad10, nframes)
-                    pos1 = min(pad11 + 1, nframes)
-                    delta = pos1 - pos0
-                    if pos0 < nframes :
-                        tif.asarray(key=slice(pos0, pos1, 1), out=array_pad1[:delta,:,:])
+                for f in futures:
+                    f.result()
 
             # Slicing if end of acquisition
             if pad11 + 1 > nframes :
-                loads = [load[:nframes - pad11 - 1] for load in loads]
+                loads = [load[:nframes - pad11 - 1] if load is not None else None for load in loads]
 
 
 
@@ -118,14 +110,47 @@ def load_data(*tif_paths, chunk=None, pad=0, bbox=None, iterator=range) :
 
             # Make channel views
             channels = []
-            for load, box in zip(loads, bbox) :
+            for load, mmap, box in zip(loads, mmaps_chunks, bbox) :
                 for bb in box :
                     # bb = (x0, y0, x1, y1) slicing --> [y0:y1, x0:x1]
                     x0, y0, x1, y1 = bb
-                    channel = load[:, y0:y1, x0:x1]
+                    channel = load[:, y0:y1, x0:x1] if mmap is None else mmap[:, y0:y1, x0:x1]
                     channels.append(channel)
 
 
 
             # Return the generator value
             yield channels, borders
+
+
+
+def _load_one_tif(tif, load, loop, chunk, pad, nframes, chunk1, pad10, pad11) :
+
+    # Defining views
+    array_pad0 = load[:pad]
+    array_chunk = load[-pad-chunk:len(load)-pad]
+    array_pad1 = load[len(load)-pad:]
+
+    # First loop scenario
+    if pad > 0 and loop == 0 :
+        tif.asarray(key=slice(0, pad, 1), out=array_pad1)
+
+    # Transfering already loaded data
+    if pad > 0 :
+        np.copyto(array_pad0, array_chunk[-pad:], casting='no')
+        np.copyto(array_chunk[:pad,:,:], array_pad1, casting='no')
+
+    # Loading chunk data
+    pos0 = min(chunk1 + pad - chunk + 1, nframes)
+    pos1 = min(chunk1 + 1, nframes)
+    delta = pos1 - pos0
+    if pos0 < nframes :
+        tif.asarray(key=slice(pos0, pos1, 1), out=array_chunk[pad:pad+delta,:,:])
+
+    # Loading pad1 data
+    if pad > 0 :
+        pos0 = min(pad10, nframes)
+        pos1 = min(pad11 + 1, nframes)
+        delta = pos1 - pos0
+        if pos0 < nframes :
+            tif.asarray(key=slice(pos0, pos1, 1), out=array_pad1[:delta,:,:])

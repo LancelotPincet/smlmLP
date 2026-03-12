@@ -4,7 +4,7 @@ version = "0.1.12"
 description = "A python library for Single Molecule Localization Microscopy."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [ "Bottleneck", "arrlp", "corelp", "numpy", "pandas", "stacklp", "tifffile",]
+dependencies = [ "Bottleneck", "arrlp", "corelp", "funclp", "numpy", "pandas", "stacklp", "tifffile",]
 
 [build-system]
 requires = [ "uv_build",]
@@ -16,8 +16,8 @@ docs = [ "sphinx", "sphinx-design", "sphinx-rtd-theme", "toml",]
 anaconda = [ "ipykernel", "spyder-kernels",]
 
 [project.optional-dependencies]
-cuda12 = [ "arrlp[cuda12]", "stacklp[cuda12]",]
-cuda13 = [ "arrlp[cuda13]", "stacklp[cuda13]",]
+cuda12 = [ "arrlp[cuda12]", "stacklp[cuda12]", "funclp[cuda12]",]
+cuda13 = [ "arrlp[cuda13]", "stacklp[cuda13]", "funclp[cuda13]",]
 
 [tool.uv]
 required-environments = [ "sys_platform == 'linux' and platform_machine == 'x86_64'", "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",]
@@ -26,6 +26,9 @@ required-environments = [ "sys_platform == 'linux' and platform_machine == 'x86_
 workspace = true
 
 [tool.uv.sources.corelp]
+workspace = true
+
+[tool.uv.sources.funclp]
 workspace = true
 
 [tool.uv.sources.stacklp]

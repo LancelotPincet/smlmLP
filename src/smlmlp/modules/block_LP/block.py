@@ -24,6 +24,7 @@ def block() :
     '''
     This function is a decorator to be used on block function, which allow to use config for default values.
     A decorated function can use a config object with config=config_object to defined default value of all the keyword only parameters.
+    You can also use a Locs object via the locs=mylocsobject attribute for all parameters linked to localizations
     This decorator works for functions and generators.
     Computation time will be added for each call of the decorated function in block.times dictionary.
     
@@ -46,15 +47,17 @@ def block() :
     def decorator(function) :
         name = function.__name__
         @functools.wraps(function)
-        def wrapper(*args, config=None, **kwargs) -> None :
+        def wrapper(*args, config=None, locs=None, **kwargs) -> None :
 
-            # Manages kwargs from config
+            # Manages kwargs from config and locs
             if config is not None :
                 signature = inspect.signature(function)
                 kw = {}
                 for pname, param in signature.parameters.items() :
                     if param.kind is inspect.Parameter.KEYWORD_ONLY and hasattr(config, pname) :
                         kw[pname] = getattr(config, pname)
+                    elif param.kind is inspect.Parameter.KEYWORD_ONLY and hasattr(locs, pname) :
+                        kw[pname] = getattr(locs, pname)
                 kw.update(kwargs)
                 kwargs = kw
 

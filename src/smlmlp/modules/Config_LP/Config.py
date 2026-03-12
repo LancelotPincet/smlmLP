@@ -160,12 +160,16 @@ class Config() :
     # Background configurations
 
     @metadatum('Backgrounds', dtype=float)
-    def temporal_window(self) : # For temporal median [ms]
-        return 25 * self.exposure
+    def localmedian_window(self) : # For temporal local median [ms]
+        return 1250
 
     @metadatum('Backgrounds', dtype=float)
-    def local_sigma(self) : # For local mean [nm]
-        return 15 * self.pixel[0][0]
+    def localmean_radius(self) : # For spatial local mean [nm]
+        return 800
+
+    @metadatum('Backgrounds', dtype=float)
+    def localmini_radius(self) : # For spatial local mini [nm]
+        return 400
 
 
 
