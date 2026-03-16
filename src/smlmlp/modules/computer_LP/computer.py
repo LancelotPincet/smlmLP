@@ -17,6 +17,7 @@ import psutil
 import shutil
 import numba.cuda
 import subprocess
+from arrlp import gc
 
 
 
@@ -31,23 +32,29 @@ class Computer() :
 
 class RAM() :
     def total(self) :
+        gc()
         return psutil.virtual_memory().total / (1024 ** 3)
     def free(self) :
+        gc()
         return psutil.virtual_memory().available / (1024 ** 3)
     def used(self) :
+        gc()
         return psutil.virtual_memory().used / (1024 ** 3)
 
 class VRAM() :
     def total(self) :
         if not numba.cuda.is_available() : return 0
+        gc()
         info = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total,memory.free,memory.used,utilization.gpu,temperature.gpu', '--format=csv,noheader'], capture_output=True, text=True).stdout.strip().split("\n")[0].split(", ")
         return float(info[1].split(' ')[0]) / 1000 
     def free(self) :
         if not numba.cuda.is_available() : return 0
+        gc()
         info = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total,memory.free,memory.used,utilization.gpu,temperature.gpu', '--format=csv,noheader'], capture_output=True, text=True).stdout.strip().split("\n")[0].split(", ")
         return float(info[2].split(' ')[0]) / 1000
     def used(self) :
         if not numba.cuda.is_available() : return 0
+        gc()
         info = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total,memory.free,memory.used,utilization.gpu,temperature.gpu', '--format=csv,noheader'], capture_output=True, text=True).stdout.strip().split("\n")[0].split(", ")
         return float(info[3].split(' ')[0]) / 1000
 

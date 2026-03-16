@@ -5,7 +5,7 @@
 
 
 
-def metadatum(group, dtype=None, name=None):
+def metadatum(group, dtype=None, name=None, iterable=None):
     '''
     Decorator used in Config class when defining a metadatum property
     will store the datum in the metadata dictionnary
@@ -25,8 +25,17 @@ def metadatum(group, dtype=None, name=None):
 
         #Setter
         def setter(self, value):
-            if dtype is not None :
-                value = dtype(value)
+            if iterable is not None :
+                try :
+                    if len(value) != iterable :
+                        raise ValueError(f'Cannot have lenght {len(value)}')
+                except TypeError :
+                    value = [value for _ in range(iterable)]
+                if dtype is not None :
+                    value = [dtype(v) for v in value]
+            else :
+                if dtype is not None :
+                    value = dtype(value)
             setattr(self, f'_{datum}', value)
 
         #Deleter

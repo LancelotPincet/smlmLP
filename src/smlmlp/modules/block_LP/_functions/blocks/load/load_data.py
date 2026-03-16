@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # %% Function
 @block()
-def load_data(*tif_paths, chunk=None, pad=0, bbox=None, memmap=True, iterator=range) :
+def load_data(*tif_paths, chunk=None, pad=0, bbox=None, memmap=True, flip=None, iterator=range) :
     '''
     This generator loads SMLM raw data in chunks from various tif files.
     '''
@@ -110,12 +110,17 @@ def load_data(*tif_paths, chunk=None, pad=0, bbox=None, memmap=True, iterator=ra
 
             # Make channel views
             channels = []
+            count = 0
             for load, mmap, box in zip(loads, mmaps_chunks, bbox) :
                 for bb in box :
                     # bb = (x0, y0, x1, y1) slicing --> [y0:y1, x0:x1]
                     x0, y0, x1, y1 = bb
                     channel = load[:, y0:y1, x0:x1] if mmap is None else mmap[:, y0:y1, x0:x1]
+                    if flip is not None :
+                        if flip[count][0] : channel = channel[:, ::-1, :]
+                        if flip[count][1] : channel = channel[:, :, ::-1]
                     channels.append(channel)
+                    count += 1
 
 
 

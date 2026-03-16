@@ -54,9 +54,9 @@ def block() :
                 signature = inspect.signature(function)
                 kw = {}
                 for pname, param in signature.parameters.items() :
-                    if param.kind is inspect.Parameter.KEYWORD_ONLY and hasattr(config, pname) :
+                    if (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(config, pname) :
                         kw[pname] = getattr(config, pname)
-                    elif param.kind is inspect.Parameter.KEYWORD_ONLY and hasattr(locs, pname) :
+                    elif (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(locs, pname) :
                         kw[pname] = getattr(locs, pname)
                 kw.update(kwargs)
                 kwargs = kw

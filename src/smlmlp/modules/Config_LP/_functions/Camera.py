@@ -16,13 +16,40 @@ class Camera :
     Defines camera instance
     '''
 
-    metadata = ["npixels", "bits", "pixel", "nchannels", "ADU", "QE"]
+    metadata = [ # (metadata, group)
+        ("nchannels", "Cameras"),
+        ("npixels", "Cameras"),
+        ("bits", "Cameras"),
+        ("pixel", "Cameras"),
+        ("ADU", "Cameras"),
+        ("QE", "Cameras"),
+        ]
     properties = []
 
 
 
     def __init__(self, config) :
         self.config = config
+
+
+
+    # Channels
+
+    @property
+    def channels(self) :
+        if not hasattr(self, '_channels') : self.nchannels = 1
+        return self._channels
+    @property
+    def nchannels(self) :
+        return len(self.channels)
+    @nchannels.setter
+    def nchannels(self, value) :
+        from smlmlp import Channel
+        self._channels = [Channel(self) for _ in range(int(value))]
+    @property
+    def _nchannels(self) :
+        channels = getattr(self, '_channels', None)
+        return None if channels is None else len(channels)
 
 
 
@@ -39,6 +66,7 @@ class Camera :
 
 
     # Data
+
     @prop(dtype=int)
     def bits(self) :
         return 16
@@ -50,6 +78,7 @@ class Camera :
 
 
     # Photons counting
+
     @prop(dtype=float)
     def ADU(self) : # Analog to Digital Unit
         return 0.25
@@ -59,19 +88,6 @@ class Camera :
         0.8
     
 
-
-    # Channels
-    @property
-    def channels(self) :
-        if not hasattr(self, '_channels') : self.nchannels = 1
-        return self._channels
-    @property
-    def nchannels(self) :
-        return len(self.channels)
-    @nchannels.setter
-    def nchannels(self, value) :
-        from smlmlp import Channel
-        self._channels = [Channel(self) for _ in range(int(value))]
 
     @property
     def FOV_max(self) : # (y, y) [µm]

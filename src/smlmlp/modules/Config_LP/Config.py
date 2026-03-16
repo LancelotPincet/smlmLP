@@ -88,8 +88,9 @@ class Config() :
             data_dict = {}
             data[group_name] = data_dict
             for datum in group_list :
-                value = getattr(self, datum)
-                data_dict[datum] = json_convert(value)
+                value = getattr(self, f'_{datum}', None)
+                if value is not None :
+                    data_dict[datum] = json_convert(value)
         return data
 
 
@@ -111,10 +112,13 @@ class Config() :
 
     @metadatum('Cameras')
     def nfiles(self) :
-        return len(self.cameras)
+        raise SyntaxError('Should not be called')
     @nfiles.setter
     def nfiles(self, value) :
         self.cameras = [Camera(self) for _ in range(int(value))]
+    @property
+    def _nfiles(self) :
+        return len(self.cameras)
 
     @property
     def FOV_max(self) :
@@ -159,42 +163,6 @@ class Config() :
     # Blinking
 
     @metadatum('Blinks')
-    def psf_sigma(self) :
-        return [channel.psf_sigma for channel in self.channels]
-    @psf_sigma.setter
-    def psf_sigma(self, value) :
-        try :
-            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
-        except TypeError :
-            value = [value for _ in range(self.total_nchannels)]     
-        for channel, v in zip(self.channels, value) :
-            channel.psf_sigma = v
-    
-    @metadatum('Blinks')
-    def psf_eccentricity(self) :
-        return [channel.psf_eccentricity for channel in self.channels]
-    @psf_eccentricity.setter
-    def psf_eccentricity(self, value) :
-        try :
-            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
-        except TypeError :
-            value = [value for _ in range(self.total_nchannels)]     
-        for channel, v in zip(self.channels, value) :
-            channel.psf_eccentricity = v
-    
-    @metadatum('Blinks')
-    def psf_theta(self) :
-        return [channel.psf_theta for channel in self.channels]
-    @psf_theta.setter
-    def psf_theta(self, value) :
-        try :
-            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
-        except TypeError :
-            value = [value for _ in range(self.total_nchannels)]     
-        for channel, v in zip(self.channels, value) :
-            channel.psf_theta = v
-    
-    @metadatum('Blinks')
     def on_time(self) : # ms
         return 50.
 
@@ -204,22 +172,22 @@ class Config() :
     # Background configurations
 
     @metadatum('Backgrounds', dtype=float)
-    def localmedian_window(self) : # For temporal local median [ms]
-        return 1250
+    def median_window(self) : # For temporal median [ms]
+        return self.on_time * 10
 
     @metadatum('Backgrounds', dtype=float)
-    def localmean_radius(self) : # For spatial local mean [nm]
-        return 800
+    def mean_radius(self) : # For spatial mean [nm]
+        return max(self.psf_sigma) * 8
 
     @metadatum('Backgrounds', dtype=float)
-    def localmini_radius(self) : # For spatial local mini [nm]
-        return 400
+    def mini_radius(self) : # For spatial mini [nm]
+        return max(self.psf_sigma)
 
 
 
 # Adding Camera metadata
-for data in Camera.metadata :
-    @metadatum('Cameras', name=data)
+for data, group in Camera.metadata :
+    @metadatum(group, name=data)
     def camera_property(self, data=data) :
         return [getattr(camera, data) for camera in self.cameras]
     @camera_property.setter
@@ -231,6 +199,12 @@ for data in Camera.metadata :
         for camera, v in zip(self.cameras, value) :
             setattr(camera, data, v)
     setattr(Config, data, camera_property)
+    @property
+    def _camera_property(self, data=data) :
+        value = [getattr(camera, f'_{data}', None) for camera in self.cameras]
+        bool_ = [v is None for v in value]
+        return None if any(bool_) else value
+    setattr(Config, f'_{data}', _camera_property)
     @property
     def channel_property(self, data=data) :
         return [getattr(channel, data) for channel in self.channels]
@@ -258,8 +232,8 @@ for data in Camera.properties :
 
 
 # Adding Channel metadata
-for data in Channel.metadata :
-    @metadatum('Channels', name=data)
+for data, group in Channel.metadata :
+    @metadatum(group, name=data)
     def channel_property(self, data=data) :
         return [getattr(channel, data) for channel in self.channels]
     @channel_property.setter
@@ -271,6 +245,12 @@ for data in Channel.metadata :
         for channel, v in zip(self.channels, value) :
             setattr(channel, data, v)
     setattr(Config, data, channel_property)
+    @property
+    def _channel_property(self, data=data) :
+        value = [getattr(channel, f'_{data}', None) for channel in self.channels]
+        bool_ = [v is None for v in value]
+        return None if any(bool_) else value
+    setattr(Config, f'_{data}', _channel_property)
 
 # Adding Channel properties
 for data in Channel.properties :
@@ -293,9 +273,19 @@ for data in Channel.properties :
 
 # Convert to json function
 def json_convert(value) :
-    if isinstance(value, tuple) : value = list(value)
-    if isinstance(value, list) : value = [json_convert(v) for v in value]
-    if isinstance(value, np.ndarray) : value = list(value)
+    if isinstance(value, bool) or isinstance(value, np.bool_) : value = bool(value)
+    if isinstance(value, int) or isinstance(value, np.integer) : value = int(value)
+    if isinstance(value, float) or isinstance(value, np.floating) : value = float(value)
+    if isinstance(value, tuple) or isinstance(value, list) : value = [json_convert(v) for v in value]
+    if isinstance(value, np.ndarray) :
+        value = value.ravel()
+        if np.issubdtype(value.dtype, np.bool_) :
+            value = value.astype(bool)
+        elif np.issubdtype(value.dtype, np.integer) :
+            value = value.astype(int)
+        elif np.issubdtype(value.dtype, np.floating) :
+            value = value.astype(float)
+        value = list(value)
     return value
 
 

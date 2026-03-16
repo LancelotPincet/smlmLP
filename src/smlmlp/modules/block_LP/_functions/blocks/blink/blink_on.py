@@ -17,7 +17,7 @@ from scipy.optimize import curve_fit
 
 # %% Function
 @block()
-def temporal_autocorr(channels, crop=None, *, psf_sigma=1., exposure=1., channel_pixel=1., cuda=False, parallel=False) :
+def blink_on(channels, crop=None, /, psf_sigma=1., *, exposure=1., channel_pixel=1., cuda=False, parallel=False) :
     '''
     This function creates the temporal autocorrelation for on time measurements.
     '''
