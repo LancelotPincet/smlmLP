@@ -16,7 +16,7 @@ from scipy.optimize import curve_fit
 
 # %% Function
 @block()
-def blink_psf(channels, crop=20, *,  channel_pixel=1., cuda=False, parallel=False) :
+def blink_psf(channels, /, crop=20, *,  channel_pixel=1., cuda=False, parallel=False) :
     '''
     This function creates the global psf image and characterizations from the channels spatial autocorrelations.
     '''

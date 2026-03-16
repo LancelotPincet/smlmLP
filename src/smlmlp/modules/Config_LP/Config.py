@@ -21,6 +21,7 @@ from smlmlp import metadatum, Camera, Channel
 from contextlib import ExitStack
 import tifffile as tiff
 from stacklp import shapetif
+from arrlp import coordinates
 
 
 
@@ -134,10 +135,6 @@ class Config() :
     def frame_bytes(self) : # gigabytes/frame
         return sum([camera.frame_bytes for camera in self.cameras])
 
-    @metadatum('Cameras', dtype=float)
-    def exposure(self) : # [ms]
-        return 50.
-
 
 
     # Channels
@@ -160,12 +157,15 @@ class Config() :
 
 
 
-    # Blinking
+    # Time
+
+    @metadatum('Cameras', dtype=float)
+    def exposure(self) : # [ms]
+        return 50.
 
     @metadatum('Blinks')
     def on_time(self) : # ms
         return 50.
-
 
 
 
@@ -182,6 +182,48 @@ class Config() :
     @metadatum('Backgrounds', dtype=float)
     def mini_radius(self) : # For spatial mini [nm]
         return max(self.psf_sigma)
+
+
+
+    # Temporal kernel
+
+    @metadatum('Signals')
+    def temporal_substract_factor(self) :
+        return None
+
+    @property
+    def temporal_kernel_shape(self) :
+        on_frames = self.on_time / self.exposure
+        if self.temporal_substract_factor is not None : on_frames *= self.temporal_substract_factor
+        on_frames = int(np.ceil(on_frames))
+        return (on_frames * 10 + 1),
+
+    @property
+    def on_time_kernel(self) :
+        T, = coordinates(shape=self.temporal_kernel_shape, pixel=self.exposure)
+        from funclp import Exponential1
+        exponential = Exponential1(tau=self.on_time)
+        k = exponential(T)
+        k -= k.min()
+        k /= k.sum()
+        return k
+
+    @property
+    def temporal_subtract_kernel(self) :
+        if self.temporal_substract_factor is None : return None
+        exposure = self.exposure / self.temporal_kernel_shape
+        T, = coordinates(shape=self.temporal_kernel_shape, pixel=exposure)
+        from funclp import Exponential1
+        exponential = Exponential1(tau=self.on_time)
+        k = exponential(T)
+        k -= k.min()
+        k /= k.sum()
+        return k
+
+    @prop(cache=True)
+    def temporal_kernel(self) :
+        if self.temporal_substract_factor is None : return self.on_time_kernel
+        return self.on_time_kernel - self.temporal_subtract_kernel
 
 
 
