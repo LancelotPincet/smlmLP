@@ -191,16 +191,25 @@ class Config() :
 
     @metadatum('Signals')
     def spatial_subtract_factor(self) :
-        return None
+        return 0.
+    @spatial_subtract_factor.setter
+    def spatial_subtract_factor(self, value) :
+        self._spatial_subtract_factor = value
+        for channel in self.channels:
+            channel._spatial_kernel = None
 
     @metadatum('Signals')
     def temporal_subtract_factor(self) :
-        return None
+        return 0.
+    @temporal_subtract_factor.setter
+    def temporal_subtract_factor(self, value) :
+        self._temporal_subtract_factor = value
+        self._temporal_kernel = None
 
     @property
     def temporal_kernel_shape(self) :
         on_frames = self.on_time / self.exposure
-        if self.temporal_subtract_factor is not None : on_frames *= self.temporal_subtract_factor
+        if self.temporal_subtract_factor > 1 : on_frames *= self.temporal_subtract_factor
         on_frames = int(np.ceil(on_frames))
         return (on_frames * 10 + 1),
 
@@ -210,27 +219,27 @@ class Config() :
         from funclp import Exponential1
         exponential = Exponential1(tau=self.on_time)
         k = exponential(np.abs(T))
-        k -= k.min()
         k /= k.sum()
         return k
 
     @property
     def temporal_subtract_kernel(self) :
-        if self.temporal_subtract_factor is None : return None
-        exposure = self.exposure / self.spatial_subtract_factor
+        if self.temporal_subtract_factor <= 1 : return None
+        exposure = self.exposure / self.temporal_subtract_factor
         T, = coordinates(shape=self.temporal_kernel_shape, pixel=exposure)
         from funclp import Exponential1
         exponential = Exponential1(tau=self.on_time)
         k = exponential(np.abs(T))
-        k -= k.min()
         k /= k.sum()
         return k
 
     @prop(cache=True)
     def temporal_kernel(self) :
-        if self.temporal_subtract_factor is None : return self.on_time_kernel
-        return self.on_time_kernel - self.temporal_subtract_kernel
-
+        if self.temporal_subtract_factor <= 1 :
+            return self.on_time_kernel
+        k = self.on_time_kernel - self.temporal_subtract_kernel
+        return k - k.mean()
+        
 
 
 # Adding Camera metadata

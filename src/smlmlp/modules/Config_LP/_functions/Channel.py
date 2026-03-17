@@ -29,7 +29,7 @@ class Channel :
         ("psf_ty", "Blinks"),
         ("psf_coeffs", "Blinks"),
         ]
-    properties = ["psf_sigma", "psf_radius", "psf_diameter", "psf_fwhm", "spatial_kernel"]
+    properties = ["psf_sigma", "psf_radius", "psf_diameter", "psf_fwhm", "spatial_kernel", "spatial_kernel_shape"]
 
 
 
@@ -111,7 +111,7 @@ class Channel :
     @property
     def spatial_kernel_shape(self) :
         sigma_pix = max(self.psf_sigx, self.psf_sigy) / min(self.pixel)
-        if self.spatial_subtract_factor is not None : sigma_pix *= self.spatial_subtract_factor
+        if self.spatial_subtract_factor > 1 : sigma_pix *= self.spatial_subtract_factor
         sigma_pix = int(np.ceil(sigma_pix))
         return (sigma_pix * 6 + 1, sigma_pix * 6 + 1)
 
@@ -128,13 +128,12 @@ class Channel :
             from funclp import Gaussian2D
             gaussian = Gaussian2D(sigx=self.psf_sigx, sigy=self.psf_sigy, theta=self.psf_theta, pixx=self.pixel[1], pixy=self.pixel[0])
             k = gaussian(X, Y)
-        k -= k.min()
         k /= k.sum()
         return k
 
     @property
     def spatial_subtract_kernel(self) :
-        if self.spatial_subtract_factor is None : return None
+        if self.spatial_subtract_factor <= 1 : return None
         pixel = self.pixel[0] / self.spatial_subtract_factor, self.pixel[1] / self.spatial_subtract_factor
         Y, X = coordinates(shape=self.spatial_kernel_shape, pixel=pixel, grid=False)
         if self.psf_tx is not None and self.psf_ty is not None and self.psf_coeffs is not None :
@@ -147,14 +146,15 @@ class Channel :
             from funclp import Gaussian2D
             gaussian = Gaussian2D(sigx=self.psf_sigx, sigy=self.psf_sigy, theta=self.psf_theta, pixx=self.pixel[1], pixy=self.pixel[0])
             k = gaussian(X, Y)
-        k -= k.min()
         k /= k.sum()
         return k
 
     @prop(cache=True)
     def spatial_kernel(self) :
-        if self.spatial_subtract_factor is None : return self.psf_kernel
-        return self.psf_kernel - self.spatial_subtract_kernel
+        if self.spatial_subtract_factor <= 1 :
+            return self.psf_kernel
+        k = self.psf_kernel - self.spatial_subtract_kernel
+        return k - k.mean()
 
 
 
