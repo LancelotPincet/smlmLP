@@ -56,6 +56,8 @@ class Config() :
 
         # Loading previous configuration
         if config is not None :
+            if isinstance(config, Config) :
+                config = config.metadata
             if isinstance(config, str) or isinstance(config,Path('').__class__):
                 config_file = Path(config).with_suffix('.json')
                 if config_file.exists() :
@@ -188,13 +190,17 @@ class Config() :
     # Temporal kernel
 
     @metadatum('Signals')
-    def temporal_substract_factor(self) :
+    def spatial_subtract_factor(self) :
+        return None
+
+    @metadatum('Signals')
+    def temporal_subtract_factor(self) :
         return None
 
     @property
     def temporal_kernel_shape(self) :
         on_frames = self.on_time / self.exposure
-        if self.temporal_substract_factor is not None : on_frames *= self.temporal_substract_factor
+        if self.temporal_subtract_factor is not None : on_frames *= self.temporal_subtract_factor
         on_frames = int(np.ceil(on_frames))
         return (on_frames * 10 + 1),
 
@@ -203,26 +209,26 @@ class Config() :
         T, = coordinates(shape=self.temporal_kernel_shape, pixel=self.exposure)
         from funclp import Exponential1
         exponential = Exponential1(tau=self.on_time)
-        k = exponential(T)
+        k = exponential(np.abs(T))
         k -= k.min()
         k /= k.sum()
         return k
 
     @property
     def temporal_subtract_kernel(self) :
-        if self.temporal_substract_factor is None : return None
-        exposure = self.exposure / self.temporal_kernel_shape
+        if self.temporal_subtract_factor is None : return None
+        exposure = self.exposure / self.spatial_subtract_factor
         T, = coordinates(shape=self.temporal_kernel_shape, pixel=exposure)
         from funclp import Exponential1
         exponential = Exponential1(tau=self.on_time)
-        k = exponential(T)
+        k = exponential(np.abs(T))
         k -= k.min()
         k /= k.sum()
         return k
 
     @prop(cache=True)
     def temporal_kernel(self) :
-        if self.temporal_substract_factor is None : return self.on_time_kernel
+        if self.temporal_subtract_factor is None : return self.on_time_kernel
         return self.on_time_kernel - self.temporal_subtract_kernel
 
 

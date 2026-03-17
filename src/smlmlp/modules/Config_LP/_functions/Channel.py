@@ -28,7 +28,6 @@ class Channel :
         ("psf_tx", "Blinks"),
         ("psf_ty", "Blinks"),
         ("psf_coeffs", "Blinks"),
-        ("spatial_substract_factor", "Signals"),
         ]
     properties = ["psf_sigma", "psf_radius", "psf_diameter", "psf_fwhm", "spatial_kernel"]
 
@@ -105,12 +104,14 @@ class Channel :
 
     # Spatial kernel
 
-    spatial_substract_factor = None
+    @property
+    def spatial_subtract_factor(self) :
+        return self.camera.config.spatial_subtract_factor
 
     @property
     def spatial_kernel_shape(self) :
-        sigma_pix = max(self.sigx, self.sigy) / min(self.pixel)
-        if self.spatial_substract_fact is not None : sigma_pix *= self.spatial_substract_fact
+        sigma_pix = max(self.psf_sigx, self.psf_sigy) / min(self.pixel)
+        if self.spatial_subtract_factor is not None : sigma_pix *= self.spatial_subtract_factor
         sigma_pix = int(np.ceil(sigma_pix))
         return (sigma_pix * 6 + 1, sigma_pix * 6 + 1)
 
@@ -119,7 +120,9 @@ class Channel :
         Y, X = coordinates(shape=self.spatial_kernel_shape, pixel=self.pixel, grid=False)
         if self.psf_tx is not None and self.psf_ty is not None and self.psf_coeffs is not None :
             from funclp import Spline2D
-            spline = Spline2D(tx=self.psf_tx, ty=self.psf_ty, coeffs=self.psf_coeffs)
+            tx, ty = np.asarray(self.psf_tx), np.asarray(self.psf_ty)
+            coeffs = np.asarray(self.psf_coeffs).reshape(ty.size-4, tx.size-4) # 4 = k + 1 (order + 1)
+            spline = Spline2D(tx=tx, ty=ty, coeffs=coeffs)
             k = spline(X, Y)
         else :
             from funclp import Gaussian2D
@@ -131,12 +134,14 @@ class Channel :
 
     @property
     def spatial_subtract_kernel(self) :
-        if self.spatial_substract_factor is None : return None
-        pixel = self.pixel[0] / self.spatial_substracct_kernel, self.pixel[1] / self.spatial_substract_kernel
+        if self.spatial_subtract_factor is None : return None
+        pixel = self.pixel[0] / self.spatial_subtract_factor, self.pixel[1] / self.spatial_subtract_factor
         Y, X = coordinates(shape=self.spatial_kernel_shape, pixel=pixel, grid=False)
         if self.psf_tx is not None and self.psf_ty is not None and self.psf_coeffs is not None :
             from funclp import Spline2D
-            spline = Spline2D(tx=self.psf_tx, ty=self.psf_ty, coeffs=self.psf_coeffs)
+            tx, ty = np.asarray(self.psf_tx), np.asarray(self.psf_ty)
+            coeffs = np.asarray(self.psf_coeffs).reshape(ty.size-4, tx.size-4) # 4 = k + 1 (order + 1)
+            spline = Spline2D(tx=tx, ty=ty, coeffs=coeffs)
             k = spline(X, Y)
         else :
             from funclp import Gaussian2D
@@ -148,7 +153,7 @@ class Channel :
 
     @prop(cache=True)
     def spatial_kernel(self) :
-        if self.spatial_substract_factor is None : return self.psf_kernel
+        if self.spatial_subtract_factor is None : return self.psf_kernel
         return self.psf_kernel - self.spatial_subtract_kernel
 
 
