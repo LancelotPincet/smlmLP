@@ -25,9 +25,9 @@ class Channel :
         ("psf_sigx", "Blinks"),
         ("psf_sigy", "Blinks"),
         ("psf_theta", "Blinks"),
-        ("psf_tx", "Blinks"),
-        ("psf_ty", "Blinks"),
-        ("psf_coeffs", "Blinks"),
+        ("psf_tx", "Data"),
+        ("psf_ty", "Data"),
+        ("psf_coeffs", "Data"),
         ]
     properties = ["psf_sigma", "psf_radius", "psf_diameter", "psf_fwhm", "spatial_kernel", "spatial_kernel_shape"]
 

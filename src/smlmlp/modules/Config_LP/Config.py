@@ -13,7 +13,7 @@ This class stores configuration values in an object that can be saved and loaded
 
 
 # %% Libraries
-from corelp import prop, selfkwargs
+from corelp import prop, selfkwargs, folder
 from pathlib import Path
 import json
 import numpy as np
@@ -63,6 +63,13 @@ class Config() :
                 if config_file.exists() :
                     with open(config_file, "r") as file:
                         config = json.load(file)
+                    config_folder = config_file.parent / "_config_data"
+                    if config_folder.exists() :
+                        data = {}
+                        for file in config_folder.glob('*.npy') :
+                            key = file.stem
+                            data[key] = np.load(file)
+                        config["Data"] = data
                 else :
                     raise SyntaxError(f'config path was not recognized: {config}')
             for group_dict in config.values() :
@@ -102,8 +109,14 @@ class Config() :
         path = Path(path)
         if file is not None : path = path / file
         path = path.with_suffix('.json')
+        metadata = self.metadata
+        data = metadata.pop('Data')
         with open(path, 'w') as json_file:
-            json.dump(self.metadata, json_file, indent=4)
+            json.dump(metadata, json_file, indent=4)
+        config_folder = folder(path.parent / "_config_data", warning=False)
+        for key, value in data.items() :
+            np.save(config_folder / f"{key}.npy", np.asarray(value))
+
 
 
 
