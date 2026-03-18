@@ -9,7 +9,8 @@
 from smlmlp import block, Config
 from arrlp import get_xp
 import numba as nb
-from numba import cuda
+from numba import cuda as nb_cuda
+import numpy as np
 import math
 
 
@@ -26,6 +27,8 @@ def bkgd_gain(channels, /, n_iter=5, k_sigma=5., *, cuda=False, parallel=False) 
     G, Mu, Sigma, N = [], [], [], []
     for channel in channels :
         channel = xp.asarray(channel)
+        if len(channel) > 10000 :
+            channel = channel[:10000]
         
         # GPU
         if cuda :
@@ -33,36 +36,37 @@ def bkgd_gain(channels, /, n_iter=5, k_sigma=5., *, cuda=False, parallel=False) 
             # Allocate
             T, Y, X = channel.shape
             g = xp.empty(shape=(Y, X), dtype=np.float32)
-            b = xp.empty(shape=(Y, X), dtype=np.float32)
+            mu = xp.empty(shape=(Y, X), dtype=np.float32)
             sig = xp.empty(shape=(Y, X), dtype=np.float32)
             n = xp.empty(shape=(Y, X), dtype=np.float32)
 
             # Call kernel
+            threads_per_block = (16, 16)
             tx, ty = threads_per_block
             bx = math.ceil(X / tx)
             by = math.ceil(Y / ty)
             blocks_per_grid = (bx, by)
-            gain_gpu[blocks_per_grid, threads_per_block](channel, g, b, sig, n, n_iter, k_sigma)
-            cuda.synchronize()
+            gain_gpu[blocks_per_grid, threads_per_block](channel, g, mu, sig, n, n_iter, k_sigma)
+            nb_cuda.synchronize()
 
             # Bring back
             g = xp.asnumpy(g)
-            b = xp.asnumpy(b)
+            mu = xp.asnumpy(mu)
             sig = xp.asnumpy(sig)
             n = xp.asnumpy(n)
             
         # CPU
         else :
             with nb_threads(parallel) :
-                g, b, sig, n = gain_gpu(channel, n_iter, k_sigma)
+                g, mu, sig, n = gain_gpu(channel, n_iter, k_sigma)
             
         # Append
         G.append(g)
-        B.append(b)
+        Mu.append(mu)
         Sigma.append(sig)
         N.append(n)
         
-    return G, dict(background=B, noise=Sigma, npixels=N)
+    return G, dict(background=Mu, noise=Sigma, npixels=N)
 
 
 
@@ -197,7 +201,7 @@ def gain_cpu(stack: np.ndarray,
 
 
 
-@cuda.jit(device=True, fastmath=True)
+@nb_cuda.jit(device=True, fastmath=True)
 def _gain_gpu(trace, T, n_iter, k_sigma, result):
     """
     Device function — runs on a single CUDA thread for one pixel.
@@ -273,7 +277,7 @@ def _gain_gpu(trace, T, n_iter, k_sigma, result):
 
 
 
-@cuda.jit(fastmath=True)
+@nb_cuda.jit(fastmath=True)
 def gain_gpu(stack, G_map, B_map, sigma_map,
                      n_clean_map, n_iter, k_sigma):
     """
@@ -285,7 +289,7 @@ def gain_gpu(stack, G_map, B_map, sigma_map,
     sigma_map  : (Y, X) float32
     n_clean_map: (Y, X) float32
     """
-    x, y = cuda.grid(2)
+    x, y = nb_cuda.grid(2)
     T, Y, X = stack.shape
 
     if x >= X or y >= Y:
@@ -293,16 +297,16 @@ def gain_gpu(stack, G_map, B_map, sigma_map,
 
     # Copy pixel trace into local array
     # Maximum trace length — adjust if needed
-    MAX_T = 100000
-    trace = cuda.local.array(MAX_T, dtype=nb.float32)
+    MAX_T = 10000
+    trace = nb_cuda.local.array(MAX_T, dtype=nb.float32)
 
     for t in range(T):
         trace[t] = stack[t, y, x]
 
     # Temporary result array
-    result = cuda.local.array(4, dtype=nb.float32)
+    result = nb_cuda.local.array(4, dtype=nb.float32)
 
-    _gain_pixel_cuda(trace, T, n_iter, k_sigma, result)
+    _gain_gpu(trace, T, n_iter, k_sigma, result)
 
     G_map[y, x]       = result[0]
     B_map[y, x]       = result[1]
