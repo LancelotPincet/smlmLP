@@ -13,7 +13,7 @@ from arrlp import get_xp, img_correlate
 
 # %% Function
 @block()
-def signal_spatialfilter(channels, /, spatial_kernel, signals=None, bkgds=None, *, cuda=False, parallel=False) :
+def detec_snr(channels, bkgds, /, k_noise, *, cuda=False, parallel=False) :
     '''
     This function applyies a spatial filter to enhance signal.
     '''
