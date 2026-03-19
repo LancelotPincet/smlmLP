@@ -21,10 +21,11 @@ class Camera :
         ("npixels", "Cameras"),
         ("bits", "Cameras"),
         ("pixel", "Cameras"),
-        ("ADU", "Cameras"),
+        ("gain_constructor", "Cameras"),
+        ("gain_experimental", "Backgrounds"),
         ("QE", "Cameras"),
         ]
-    properties = []
+    properties = ['camera_index', 'gain']
 
 
 
@@ -34,6 +35,11 @@ class Camera :
 
 
     # Channels
+    @property
+    def camera_index(self) :
+        for i in range(self.config.nfiles) :
+            if self.config.cameras[i] is self :
+                return i
 
     @property
     def channels(self) :
@@ -78,10 +84,17 @@ class Camera :
 
 
     # Photons counting
+    @property
+    def gain(self) :
+        return self.gain_experimental if self.gain_experimental is not None else self.gain_constructor
 
     @prop(dtype=float)
-    def ADU(self) : # Analog to Digital Unit
+    def gain_constructor(self) : # e-/ADU (Analog to Digital Unit)
         return 0.25
+
+    @prop(dtype=float)
+    def gain_experimental(self) : # e-/ADU (Analog to Digital Unit)
+        return None
 
     @prop(dtype=float)
     def QE(self) : # Quantum Efficiency

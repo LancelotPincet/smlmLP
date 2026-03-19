@@ -8,6 +8,7 @@
 # %% Libraries
 from smlmlp import block, Config
 from arrlp import gc, get_xp, img_autocorr, img_fft, img_ifft, coordinates
+import bottleneck as bn
 from funclp import Gaussian2D, Spline2D
 import numpy as np
 from scipy.optimize import curve_fit
@@ -23,7 +24,6 @@ def blink_psf(channels, /, crop=20, *,  channel_pixel=1., cuda=False, parallel=F
 
     # Optimization parameters
     xp = get_xp(cuda)
-    parallel = False if cuda else parallel
 
     # Get pixel
     pixel = Config(nfiles=len(channels), pixel=channel_pixel).pixel
@@ -38,7 +38,7 @@ def blink_psf(channels, /, crop=20, *,  channel_pixel=1., cuda=False, parallel=F
 
         # Calculating autocorrelation
         gc()
-        bkgd = xp.median(channel, axis=(0,), keepdims=True)
+        bkgd = xp.median(channel, axis=(0,), keepdims=True) if cuda else bn.median(channel, axis=0).reshape((1, *channel.shape[1:]))
         bkgd = xp.minimum(bkgd, channel)
         channel = channel - bkgd
         y0, x0 = int(channel.shape[1]//2), int(channel.shape[2]//2)

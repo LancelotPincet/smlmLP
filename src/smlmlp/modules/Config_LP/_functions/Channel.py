@@ -164,6 +164,10 @@ for data, _ in Camera.metadata :
     def camera_property(self, data=data) :
         return getattr(self.camera, data)
     setattr(Channel, data, camera_property)
-
+for data in Camera.properties :
+    @property
+    def camera_property(self, data=data) :
+        return getattr(self.camera, data)
+    setattr(Channel, data, camera_property)
 
 

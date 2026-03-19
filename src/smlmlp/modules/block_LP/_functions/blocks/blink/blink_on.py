@@ -24,7 +24,6 @@ def blink_on(channels, /, crop=None, psf_sigma=1., *, exposure=1., channel_pixel
 
     # Optimization parameters
     xp = get_xp(cuda)
-    parallel = False if cuda else parallel
 
     # Get pixel
     pixel = Config(nfiles=len(channels), pixel=channel_pixel).pixel
