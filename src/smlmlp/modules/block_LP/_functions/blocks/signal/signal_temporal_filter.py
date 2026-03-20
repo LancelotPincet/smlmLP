@@ -14,7 +14,7 @@ from stacklp import temporal_correlate
 
 # %% Function
 @block()
-def signal_temporalfilter(channels, /, temporal_kernel, signals=None, bkgds=None, *, cuda=False, parallel=False) :
+def signal_temporal_filter(channels, /, temporal_kernel, signals=None, bkgds=None, noise_corrections=None, *, cuda=False, parallel=False) :
     '''
     This function applyies a temporal filter to enhance signal.
     '''
@@ -25,7 +25,11 @@ def signal_temporalfilter(channels, /, temporal_kernel, signals=None, bkgds=None
     # Correct signal length for end of acquisition
     if signals is not None and len(signals[0]) > len(channels[0]):
         signals = [signal[:len(channel)] for channel, signal in zip(channels, signals)]
-    
+
+    # Noise corrections
+    if noise_corrections is None :
+        noise_corrections = [1. for _ in range(len(channels))]
+
     # Kernel
     kernel = xp.asarray(temporal_kernel)
     factor = xp.sqrt(xp.sum(kernel**2))
@@ -38,7 +42,7 @@ def signal_temporalfilter(channels, /, temporal_kernel, signals=None, bkgds=None
         if bkgd is not None :
             channel = channel - bkgd
         new_signal = temporal_correlate(channel, kernel=kernel, out=signal, cuda=cuda, parallel=parallel)
-        new_signal /= factor # correction factor for each different kernel
+        noise_corrections[i] *= factor
         new_signals.append(new_signal)
 
-    return new_signals
+    return new_signals, noise_corrections
