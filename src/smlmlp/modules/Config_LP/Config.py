@@ -195,16 +195,16 @@ class Config() :
         return max(self.psf_sigma) * 8
 
     @metadatum('Backgrounds', dtype=float)
-    def mini_radius(self) : # For spatial mini [nm]
+    def opening_radius(self) : # For spatial opening [nm]
         return max(self.psf_sigma)
 
 
 
-    # Temporal kernel
+    # Signal configurations
 
     @metadatum('Signals')
     def spatial_subtract_factor(self) :
-        return 0.
+        return 2.5
     @spatial_subtract_factor.setter
     def spatial_subtract_factor(self, value) :
         self._spatial_subtract_factor = value
