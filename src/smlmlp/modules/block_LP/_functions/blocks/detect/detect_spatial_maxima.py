@@ -70,10 +70,10 @@ def detect_spatial_maxima(snrs, /, snr_thresh, spatial_kernel, *, pad=0, f0=0, c
                     com_cpu(snr, fr, y_int, x_int, y, x)
 
         # Append
-        fr += f0
+        fr += f0 + 1
         y *= pixel[0]
         x *= pixel[1]
-        c = np.full_like(f, fill_value=pos, dtype=np.uint8)
+        c = np.full_like(fr, fill_value=pos, dtype=np.uint8)
         argsort = np.lexsort((x, y, fr))
         F.append(fr[argsort])
         Y.append(y[argsort])
