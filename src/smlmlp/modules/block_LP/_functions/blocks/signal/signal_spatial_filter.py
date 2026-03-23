@@ -8,6 +8,7 @@
 # %% Libraries
 from smlmlp import block
 from arrlp import get_xp, img_correlate
+import numpy as np
 
 
 
@@ -18,16 +19,13 @@ def signal_spatial_filter(channels, /, spatial_kernel, signals=None, bkgds=None,
     This function applyies a spatial filter to enhance signal.
     '''
 
-    # xp
-    xp = get_xp(cuda)
-
     # Correct signal length for end of acquisition
     if signals is not None and len(signals[0]) > len(channels[0]):
         signals = [signal[:len(channel)] for channel, signal in zip(channels, signals)]
     
     # Noise corrections
     if noise_corrections is None :
-        noise_corrections = [1. for _ in range(len(channels))]
+        noise_corrections = [np.float32(1.) for _ in range(len(channels))]
 
     new_signals = []
     for i in range(len(channels)) :
@@ -36,9 +34,10 @@ def signal_spatial_filter(channels, /, spatial_kernel, signals=None, bkgds=None,
         channel = channels[i]
         if bkgd is not None :
             channel = channel - bkgd
-        kernel = xp.asarray(spatial_kernel[i])
+        if signal is channel : signal = None
+        kernel = spatial_kernel[i]
         new_signal = img_correlate(channel, kernel=kernel, out=signal, cuda=cuda, parallel=parallel, stacks=True)
-        noise_corrections[i] *= xp.sqrt(xp.sum(kernel**2))
+        noise_corrections[i] *= np.sqrt(np.sum(kernel**2))
         new_signals.append(new_signal)
 
     return new_signals, noise_corrections

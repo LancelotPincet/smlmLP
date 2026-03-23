@@ -190,17 +190,36 @@ class Config() :
     def median_window(self) : # For temporal median [ms]
         return self.on_time * 10
 
+    @metadatum('Backgrounds', dtype=bool)
+    def do_temporal_median(self) : # For temporal median
+        return True
+
     @metadatum('Backgrounds', dtype=float)
     def mean_radius(self) : # For spatial mean [nm]
         return max(self.psf_sigma) * 8
+
+    @metadatum('Backgrounds', dtype=bool)
+    def do_spatial_mean(self) : # For spatial mean
+        return True
 
     @metadatum('Backgrounds', dtype=float)
     def opening_radius(self) : # For spatial opening [nm]
         return max(self.psf_sigma)
 
+    @metadatum('Backgrounds', dtype=bool)
+    def do_spatial_opening(self) : # For spatial opening
+        return False
+
 
 
     # Signal configurations
+
+    @metadatum('Signals', dtype=bool)
+    def do_spatial_filter(self) : # For spatial filter
+        return True
+    @metadatum('Signals', dtype=bool)
+    def do_temporal_filter(self) : # For temporal filter
+        return False
 
     @metadatum('Signals')
     def spatial_subtract_factor(self) :
@@ -233,7 +252,7 @@ class Config() :
         exponential = Exponential1(tau=self.on_time)
         k = exponential(np.abs(T))
         k /= k.sum()
-        return k
+        return k.astype(np.float32)
 
     @property
     def temporal_subtract_kernel(self) :
@@ -244,7 +263,7 @@ class Config() :
         exponential = Exponential1(tau=self.on_time)
         k = exponential(np.abs(T))
         k /= k.sum()
-        return k
+        return k.astype(np.float32)
 
     @prop(cache=True)
     def temporal_kernel(self) :
@@ -252,7 +271,14 @@ class Config() :
             return self.on_time_kernel
         k = self.on_time_kernel - self.temporal_subtract_kernel
         return k - k.mean()
-        
+
+
+
+    # Detection
+    @metadatum('Detections')
+    def snr_thresh(self) :
+        return 4.
+
 
 
 # Adding Camera metadata

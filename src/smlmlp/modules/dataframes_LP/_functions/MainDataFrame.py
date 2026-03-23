@@ -25,6 +25,7 @@ class MainDataFrame(pd.DataFrame) : # This class is here to host dynamic main da
     # Attributes
     index_name = None # raise error if stays None
     locs = None # overriden in __init__
+    head2save = [] # detections dataframe head2save
 
     def __setattr__(self, name, value):
         cls = type(self)

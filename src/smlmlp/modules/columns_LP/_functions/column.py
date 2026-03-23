@@ -58,7 +58,7 @@ class column() :
         columns[self.col] = self
         for header in self.headers :
             if header in columns.headers: raise SyntaxError(f"Header {header} is defined twice")
-            columns.headers[header] = self.col
+            columns.headers[header] = self
 
         return self
 
@@ -66,16 +66,26 @@ class column() :
 
     def __set_name__(self, cls, name):
         ''' Called when assigned to a class '''
-        self.cls = cls
+        self.cls = cls # dataframe object
         if self.index :
             self.df_name = f'{self.header}s'
             if self.df_name != self.cls.__name__ :
                 raise SyntaxError(f'Index column {self.col} does not coincide with DataFrame name {self.cls.__name__}')
             self.cls.index_name = self.header
 
-        # Assign column list
+        # Assign column dict
         if not hasattr(self.cls, "columns_list") : self.cls.columns_dict = {}
         self.cls.columns_dict[self.col] = self
+
+        # Assign saving list
+        if self.index :
+            for header in self.headers :
+                MainDataFrame.head2save.append(header)
+        else :
+            if not hasattr(self.cls, "head2save") : self.cls.head2save = []
+            for header in self.headers :
+                self.cls.head2save.append(header)
+        
 
         # Get column object from dataframe instance
         @property
@@ -100,7 +110,7 @@ class column() :
                 @property
                 def index_col(dets) :
                     if self.header not in dets.columns :
-                        raise SyntaxError(f'{self.header} is not on locs dataframe')
+                        return None
                     return dets[self.header].to_numpy()
                 @index_col.setter
                 def index_col(dets, value) :
@@ -154,7 +164,7 @@ class column() :
         # Automatic calculation
         newcol = self.func(instance)
         if newcol is None :
-            raise ValueError(f'{self.col} is not defined')
+            return None
 
         # Substitute
         if isinstance(newcol, str) :

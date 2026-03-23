@@ -6,48 +6,33 @@
 
 
 # %% Libraries
-import pandas as pd
+from smlmlp import columns
+from warnings import warn
 
 
 
-def open_df(df) :
+def open_df(locs, df) :
+
+    # Get dataframe instance
     index = df.index.name
     if index is not None :
         index = index.replace('"', '')
         index = index.replace("'", "")
     else :
-        index = 'loc'
-    idx = self.head2col.get(index)
-    if idx is None or idx not in self.index2df :
+        index = 'detection'
+    if index not in columns.headers :
         warn(f'Skipping opening unknown dataframe with index "{index}"')
-        return
+        return None
+    col = columns.headers[index]
+    df_name = col.df_name
+    dataframe =  getattr(locs, df_name)
 
-    #Set df
-    df_name = self.index2df[idx]
-    if self.col2df[idx] != 'df' :
-        _df, self.df = self._df, df_name
-    else :
-        _df = self._df
-    predf = getattr(self, df_name, None)
-    if predf is None :
-        predf = pd.DataFrame()
-        dtype = self.col2dtype[idx]
-        predf[index] = np.asarray(df.index.to_numpy(), dtype=dtype)
-        predf.set_index(index, inplace=True)
-        setattr(self, df_name, predf)
-
-    #Copying columns
+    # Apply column
     for header in df.columns :
-        header = header.replace('"', '')
-        header = header.replace("'", "")
-        if header not in self.head2col :
-            warn(f'Skipping opening unknown column "{header}"')
-            continue
-        array = df[header].to_numpy()
-        col = self.head2col[header]
-        setattr(self, col, array)
-
-    #reset df
-    self.df = _df
-
-
+        if header not in columns.headers :
+            warn(f'Skipping opening unknown column with header "{header}"')
+        col = columns.headers[header]
+        col_name = col.col
+        dtype = col.dtype
+        array = df[header].to_numpy().astype(dtype)
+        setattr(dataframe, col_name, array)

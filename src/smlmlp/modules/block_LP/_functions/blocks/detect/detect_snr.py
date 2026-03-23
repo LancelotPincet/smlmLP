@@ -6,35 +6,56 @@
 
 
 # %% Libraries
-from smlmlp import block
-from arrlp import get_xp, img_correlate
+from smlmlp import block, Config
+from arrlp import get_xp, nb_threads
+import numba as nb
+from numba import cuda as nb_cuda 
+import math
 
 
 
 # %% Function
 @block()
-def detec_snr(channels, bkgds, /, k_noise, *, cuda=False, parallel=False) :
+def detect_snr(signals, bkgds, noise_corrections=None, channel_gain=0.25, *, cuda=False, parallel=False) :
     '''
-    This function applyies a spatial filter to enhance signal.
+    This function normalizes the signals into SNRs.
     '''
 
     # xp
     xp = get_xp(cuda)
 
-    # Correct signal length for end of acquisition
-    if signals is not None and len(signals[0]) > len(channels[0]):
-        signals = [signal[:len(channel)] for channel, signal in zip(channels, signals)]
-    
-    new_signals = []
-    for i in range(len(channels)) :
-        bkgd = None if bkgds is None else bkgds[i]
-        signal = None if signals is None else signals[i]
-        channel = channels[i]
-        if bkgd is not None :
-            channel = channel - bkgd
-        kernel = xp.asarray(spatial_kernel[i])
-        new_signal = img_correlate(channel, kernel=kernel, out=signal, cuda=cuda, parallel=parallel, stacks=True)
-        new_signal /= xp.sqrt(xp.sum(kernel**2)) # correction factor for each different kernel
-        new_signals.append(new_signal)
+    # lists
+    gains = Config(nfiles=len(signals), gain_experimental=channel_gain).gain
+    if noise_corrections is None :
+        noise_corrections = [xp.float32(1.) for _ in range(len(signals))]
 
-    return new_signals
+    snrs = []
+    for i in range(len(signals)) :
+        signal = xp.asarray(signals[i], dtype=xp.float32)
+        bkgd = xp.asarray(bkgds[i], dtype=xp.float32)
+        noise_correction = xp.float32(noise_corrections[i])
+        gain = xp.float32(gains[i])
+
+        # Calculating SNR
+        if cuda :
+            threads_per_block = 256
+            blocks_per_grid = (signal.size + threads_per_block - 1) // threads_per_block
+            snr_gpu[blocks_per_grid, threads_per_block](signal.ravel(), bkgd.ravel(), noise_correction, gain)
+        else :
+            with nb_threads(parallel) :
+                snr_cpu(signal.ravel(), bkgd.ravel(), noise_correction, gain)
+
+
+
+@nb.njit(parallel=True, nogil=True, cache=True, fastmath=True)
+def snr_cpu(signal, bkgd, noise_correction, gain) :
+    for i in nb.prange(len(signal)) :
+        signal[i] = nb.float32(signal[i] / noise_correction / math.sqrt(bkgd[i] / gain))
+
+
+
+@nb_cuda.jit(fastmath=True)
+def snr_gpu(signal, bkgd, noise_correction, gain) :
+    i = nb_cuda.grid(1)
+    if i < len(signal) :
+        signal[i] = nb.float32(signal[i] / noise_correction / math.sqrt(bkgd[i] / gain))

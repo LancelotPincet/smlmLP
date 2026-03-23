@@ -129,7 +129,7 @@ class Channel :
             gaussian = Gaussian2D(sigx=self.psf_sigx, sigy=self.psf_sigy, theta=self.psf_theta, pixx=self.pixel[1], pixy=self.pixel[0])
             k = gaussian(X, Y)
         k /= k.sum()
-        return k
+        return k.astype(np.float32)
 
     @property
     def spatial_subtract_kernel(self) :
@@ -147,7 +147,7 @@ class Channel :
             gaussian = Gaussian2D(sigx=self.psf_sigx, sigy=self.psf_sigy, theta=self.psf_theta, pixx=self.pixel[1], pixy=self.pixel[0])
             k = gaussian(X, Y)
         k /= k.sum()
-        return k
+        return k.astype(np.float32)
 
     @prop(cache=True)
     def spatial_kernel(self) :
@@ -155,6 +155,16 @@ class Channel :
             return self.psf_kernel
         k = self.psf_kernel - self.spatial_subtract_kernel
         return k - k.mean()
+
+
+
+    # Crop
+
+    @prop(iterable=2, dtype=int)
+    def crop_size(self) :
+        h = self.psf_y / self.pixel[0] * 12
+        w = self.psf_x / self.pixel[1] * 12
+        return int(2*(h//2)+1), int(2*(w//2)+1)
 
 
 

@@ -50,6 +50,11 @@ def test_function() :
     locs.frames.dx = xdet_frames # spreading
     assert (locs.detections.dx == xdet).all()
 
+    # Saving and loading
+    path = debug_folder / 'locs'
+    locs.save(path)
+    locs2 = Locs(path)
+
 
 
 # %% Test function run

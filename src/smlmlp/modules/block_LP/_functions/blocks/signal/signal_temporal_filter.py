@@ -9,6 +9,7 @@
 from smlmlp import block
 from arrlp import get_xp
 from stacklp import temporal_correlate
+import numpy as np
 
 
 
@@ -19,20 +20,17 @@ def signal_temporal_filter(channels, /, temporal_kernel, signals=None, bkgds=Non
     This function applyies a temporal filter to enhance signal.
     '''
 
-    # xp
-    xp = get_xp(cuda)
-
     # Correct signal length for end of acquisition
     if signals is not None and len(signals[0]) > len(channels[0]):
         signals = [signal[:len(channel)] for channel, signal in zip(channels, signals)]
 
     # Noise corrections
     if noise_corrections is None :
-        noise_corrections = [1. for _ in range(len(channels))]
+        noise_corrections = [np.float32(1.) for _ in range(len(channels))]
 
     # Kernel
-    kernel = xp.asarray(temporal_kernel)
-    factor = xp.sqrt(xp.sum(kernel**2))
+    kernel = temporal_kernel
+    factor = np.sqrt(np.sum(kernel**2))
 
     new_signals = []
     for i in range(len(channels)) :
@@ -41,6 +39,7 @@ def signal_temporal_filter(channels, /, temporal_kernel, signals=None, bkgds=Non
         channel = channels[i]
         if bkgd is not None :
             channel = channel - bkgd
+        if signal is channel : signal = None
         new_signal = temporal_correlate(channel, kernel=kernel, out=signal, cuda=cuda, parallel=parallel)
         noise_corrections[i] *= factor
         new_signals.append(new_signal)

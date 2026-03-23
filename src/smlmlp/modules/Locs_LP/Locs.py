@@ -13,8 +13,8 @@ This class define objects corresponding to localizations sets for one experiment
 
 
 # %% Libraries
-from corelp import folder
-from smlmlp import open_df, save_df, LocsDataFrame, DetsDataFrame
+from corelp import folder, selfkwargs, prop
+from smlmlp import open_df, save_df, LocsDataFrame, DetsDataFrame, Config, columns
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -67,57 +67,78 @@ class Locs(LocsDataFrame) :
 
         #Opening data
         if source is not None :
-            open(self, source)
+            self.open(source)
+
+        # Config
+        if config is not None :
+            self.config_source = config
+        self.config = Config(config=self.config_source, **self.config_kwargs)
+
+    # Config
+    @prop()
+    def config_source(self) :
+        return None
+    @config_source.setter
+    def config_source(self, value) :
+        if getattr(self, '_config_source', None) is not None :
+            raise ValueError('Config source is defined twice')
+        self._config_source = value
+    @property
+    def config_kwargs(self) :
+        return dict(nfiles=1) if self.config_source is None else dict()
+
+    # Detections properties
     @property
     def detections(self) :
         return self.df_dict['detections']
-
+    @property
+    def ndetections(self) :
+        return len(self.detections)
 
 
     def filter(self, *filter_names, mask=None) :
-        #Get filter mask
         filters = [getattr(self, name, None) for name in filter_names]
-        if mask is not None :
-            filters += [mask]
+        if mask is not None : filters += [mask]
         mask = np.logical_and.reduce(filters)
-        df = self.df[mask].drop(columns=[self.col2head[name] for name in filter_names])
-
-        #filter all dataframe where mask can be spread
-        dfs = [df]
-        name = self._df
-        supname = self._df
-        subname = self.df2subdf[supname]
-        while supname != subname :
-            self.df = subname
-            if self.df is None :
-                break
-            self.index = self.df2index[supname]
-            mask = spread(mask, self.index, desorting=self.desorting, unique=self.unique, counts=self.counts, cumsum=self.cumsum, resort=self.resort)
-            df = self.df[mask]
-            supname = subname
-            subname = self.df2subdf[supname]
-            dfs.append(df)
-
-        cls = self.__class__
-        self.df, self.index = name, None
-        return cls(dfs, **self.metadata, _df=self._df, parent=self)
+        self.keep = mask
+        df_list = [df[mask].drop(columns=[columns[name].header for name in filter_names if columns[name].header in df]) for df in self.df_dict.values()]
+        return Locs(df_list, config=self.config)
 
 
 
-    def open(self, locs) :
-        if locs is None :
+    def open(self, source) :
+        if source is None :
             return
-        elif isinstance(locs, pd.DataFrame) :
-            open_df(locs)
-        elif isinstance(data, dict) :
-            selfkwargs(self, data)
-        elif isinstance(data,str) or isinstance(data,Path('').__class__) :
-            open_file(data)
-        elif isinstance(data, list) or isinstance(data, tuple) :
-            for d in data :
-                open_data(d)
+        elif isinstance(source, pd.DataFrame) :
+            open_df(self, source)
+        elif isinstance(source, dict) :
+            selfkwargs(self, source)
+        elif isinstance(source, str) or isinstance(source,Path('').__class__) :
+            path = Path(source)
+            if path.is_dir() : # folder : open csv and json
+                stem = path.stem
+                detection_file = path / f'{stem}_[detections].csv'
+                if not detection_file.exists() :
+                    raise ValueError('Cannot open foler without "detections" file')
+                self.open(detection_file)
+                for file in path.glob(f'{stem}_[*].csv') :
+                    if file == detection_file : continue
+                    self.open(file)
+                config_file = path / f'{stem}_[metadata].json'
+                if config_file.exists() :
+                    self.open(config_file)
+            else :
+                if path.suffix == '.csv' :
+                    self.open(pd.read_csv(path))
+                elif path.suffix == '.json' :
+                    self.config_source = path
+                else :
+                    raise SyntaxError(f'Locs cannot open file {path}')
+        elif isinstance(source, list) or isinstance(source, tuple) :
+            for value in source :
+                self.open(value)
         else :
-            raise SyntaxError('data type was not recognized for Locs')
+            raise SyntaxError('source type was not recognized for Locs')
 
 
 
@@ -128,17 +149,14 @@ class Locs(LocsDataFrame) :
         mainpath = saving_folder / f'{stem}.csv'
         
         # Saving df
-        for df_name in self.df_names :
-
-            #Get df
-            df = getattr(self, df_name, None)
+        for df_name, df in self.df_dict.items() :
             if df is None or len(df.columns) == 0 : continue
             path = mainpath.with_stem(f'{stem}_[{df_name}]')
-            save_df(df, path, df_name, self.head2save)
+            save_df(df, path, df.head2save)
 
         # Saving metadata
         mainpath = saving_folder / f'{stem}_[metadata].json'
-        save_metadata(self, mainpath)
+        self.config.save(mainpath)
 
 
 

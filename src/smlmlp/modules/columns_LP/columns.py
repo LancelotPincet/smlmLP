@@ -16,6 +16,7 @@ class Columns(dict) :
     def __init__(self, *args, **kwargs) :
         super().__init__(*args, **kwargs)
         self.headers = {}
+        self.head2save = []
 columns = Columns()
 
 

@@ -20,7 +20,7 @@ def bkgd_spatial_mean(channels, /, mean_radius=7, bkgds=None, noise_corrections=
     '''
 
     # Get pixel
-    pixel = Config(nfiles=len(channels), pixel=channel_pixel).pixel
+    channel_pixel = Config(nfiles=len(channels), pixel=channel_pixel).pixel
 
     # Correct bkgd length for end of acquisition
     if bkgds is not None and len(bkgds[0]) > len(channels[0]):
@@ -28,15 +28,15 @@ def bkgd_spatial_mean(channels, /, mean_radius=7, bkgds=None, noise_corrections=
     
     # Noise corrections
     if noise_corrections is None :
-        noise_corrections = [1. for _ in range(len(channels))]
+        noise_corrections = [np.float32(1.) for _ in range(len(channels))]
 
     new_bkgds = []
     for i in range(len(channels)) :
         bkgd = None if bkgds is None else bkgds[i]
         channel = channels[i]
-        new_bkgd = img_gaussianfilter(channel, sigma=mean_radius/2, pixel=pixel[i], out=bkgd, cuda=cuda, parallel=parallel, stacks=True)
-        k1 = -kernel(ndims=1, pixel=pixel[i][0], sigma=mean_radius/2)
-        k2 = -kernel(ndims=1, pixel=pixel[i][1], sigma=mean_radius/2)
+        new_bkgd = img_gaussianfilter(channel, sigma=mean_radius/2, pixel=channel_pixel[i], out=bkgd, cuda=cuda, parallel=parallel, stacks=True)
+        k1 = -kernel(ndims=1, pixel=channel_pixel[i][0], sigma=mean_radius/2)
+        k2 = -kernel(ndims=1, pixel=channel_pixel[i][1], sigma=mean_radius/2)
         k1[int(len(k1)//2)] += 1.
         k2[int(len(k2)//2)] += 1.
         noise_corrections[i] *= np.sqrt(np.sum(k1**2)) * np.sqrt(np.sum(k2**2))

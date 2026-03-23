@@ -16,11 +16,12 @@ This function is a decorator to be used on block function, which allow to use co
 import functools
 import time
 import inspect
+from smlmlp import columns
 
 
 
 # %% Function
-def block() :
+def block(timeit=True) :
     '''
     This function is a decorator to be used on block function, which allow to use config for default values.
     A decorated function can use a config object with config=config_object to defined default value of all the keyword only parameters.
@@ -49,15 +50,22 @@ def block() :
         @functools.wraps(function)
         def wrapper(*args, config=None, locs=None, **kwargs) -> None :
 
+            # Locs and config
+            if locs is not None :
+                if config is not None :
+                    raise SyntaxError('Cannot call config and locs in block function')
+                config = locs.config
+
             # Manages kwargs from config and locs
+            kwargs = {key: value for key, value in kwargs.items() if value is not None}
             if config is not None :
                 signature = inspect.signature(function)
                 kw = {}
                 for pname, param in signature.parameters.items() :
-                    if (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(config, pname) :
+                    if (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and pname in columns :
+                        kw[pname] = getattr(locs.detections, pname)
+                    elif (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(config, pname) :
                         kw[pname] = getattr(config, pname)
-                    elif (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(locs, pname) :
-                        kw[pname] = getattr(locs, pname)
                 kw.update(kwargs)
                 kwargs = kw
 
@@ -68,10 +76,11 @@ def block() :
 
             # Check if generator, if normal function just exit here
             if not inspect.isgenerator(result):
-                if name in block.times :
-                    block.times[name] += toc-tic
-                else :
-                    block.times[name] = toc-tic
+                if timeit :
+                    if name in block.times :
+                        block.times[name] += toc-tic
+                    else :
+                        block.times[name] = toc-tic
                 return result
             
             # If is a generator
@@ -81,10 +90,11 @@ def block() :
                         tic = time.perf_counter()
                         value = next(result)
                         toc = time.perf_counter()
-                        if name in block.times :
-                            block.times[name] += toc-tic
-                        else :
-                            block.times[name] = toc-tic
+                        if timeit :
+                            if name in block.times :
+                                block.times[name] += toc-tic
+                            else :
+                                block.times[name] = toc-tic
                         yield value
                     except StopIteration:
                         break

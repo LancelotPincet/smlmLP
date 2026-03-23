@@ -16,7 +16,7 @@ from scipy.stats import linregress
 
 # %% Function
 @block()
-def bkgd_gain(channels, /, *, nbins=50, cuda=False, parallel=False) :
+def detect_gain(channels, /, *, nbins=50, cuda=False, parallel=False) :
     '''
     This function calculates the gain maps.
     '''

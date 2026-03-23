@@ -23,6 +23,14 @@ class detections(MainDataFrame) :
 
 
 
+    # --- Filters ---
+
+    @column(headers=['filter'], save=False, index=False, agg='min')
+    def keep(self:np.bool_) : # to be used with the self.filter function only
+        return None
+
+
+
     # --- Detections ---
 
     @column(headers=['area [pix2]'], save=True, index=False, agg='mean')
