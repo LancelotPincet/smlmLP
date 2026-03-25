@@ -1,4 +1,4 @@
-template_lowername.computer module
-template_equals================
+smlmlp.computer module
+======================
 
-.. autofunction:: template_lowername.computer
+.. autofunction:: smlmlp.computer

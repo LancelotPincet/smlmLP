@@ -338,8 +338,8 @@ In the following tabs are the protocoles for most commonly used editors.
 
       As other editors have not been tested, please refer to dedicated support to run scripts from virtual environments with these.
 
-To finish, some scripts may be provided with the library **smlmLP** :doc:`(see Reference Guide) <scripts>`.
-To use them, you can just download `scripts source codes <https://github.com/LancelotPincet/smlmLP/tree/main/src/smlmlp/scripts>`_.
+To finish, some routines may be provided with the library **smlmLP** :doc:`(see Reference Guide) <routines>`.
+To use them, you can just download `routines source codes <https://github.com/LancelotPincet/smlmLP/tree/main/src/smlmlp/routines>`_.
 
 .. _create_project_without_uv:
 

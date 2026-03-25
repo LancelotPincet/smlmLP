@@ -1,7 +1,7 @@
-template_lowername.Config module
-template_equals==============
+smlmlp.Config module
+====================
 
-.. autoclass:: template_lowername.Config
+.. autoclass:: smlmlp.Config
    :members: 
    :show-inheritance:
    :undoc-members:

@@ -24,7 +24,7 @@ And for information, do not hesitate to consult the `documentation <https://smlm
 
 1. New to **smlmLP**? Check out the :doc:`Beginner Guide <beginner_guide>` to get up and running.
 2. Want a deeper understanding of key concepts in **smlmLP**? Dive into the :doc:`User Guide <user_guide>` to get an in-depth understanding of the tool.
-3. Have a doubt on a syntax in **smlmLP**? Consult the :doc:`Reference Guide <reference_guide>` to have detailed information on how to call the objects. 
+3. Have a doubt on a syntax in **smlmLP**? Consult the :doc:`Reference Guide <reference_guide>` to have detailed on the library API. 
 
 .. toctree::
    :maxdepth: 1
@@ -47,4 +47,4 @@ And for information, do not hesitate to consult the `documentation <https://smlm
    :caption: Reference guide
 
    modules
-   scripts
+   routines
