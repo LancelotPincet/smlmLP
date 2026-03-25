@@ -14,13 +14,20 @@ import numpy as np
 
 # %% Function
 @block()
-def bkgd_spatial_opening(channels, /, opening_radius=5, bkgds=None, noise_corrections=None, *, channel_pixel=1., cuda=False, parallel=False) :
+def bkgd_spatial_opening(channels, /, channels_opening_radius_pix=3., bkgds=None, noise_corrections=None, *, cuda=False, parallel=False) :
     '''
     This function creates the spatial opening background.
     '''
 
-    # Get local sigma in pixel
-    channel_pixel = Config(nfiles=len(channels), pixel=channel_pixel).pixel
+    # Get channel_mean_radius_pix
+    try :
+        if len(channels_opening_radius_pix) != len(channels) :
+            if len(channels_opening_radius_pix) == 2 :
+                channels_opening_radius_pix = [channels_opening_radius_pix for _ in range(len(channels))]
+            else :
+                raise ValueError('channel_mean_radius_pix does not have the same length as channels')
+    except TypeError:
+        channels_opening_radius_pix = [(channels_opening_radius_pix, channels_opening_radius_pix) for _ in range(len(channels))]
 
     # Correct bkgd length for end of acquisition
     if bkgds is not None and len(bkgds[0]) > len(channels[0]):
@@ -31,7 +38,7 @@ def bkgd_spatial_opening(channels, /, opening_radius=5, bkgds=None, noise_correc
         noise_corrections = [np.float32(1.) for _ in range(len(channels))]
 
     #Footprint
-    footprints = [kernel(window=2*opening_radius, pixel=pix) for pix in channel_pixel]
+    footprints = [kernel(window=(2*rad_pix[0], 2*rad_pix[1])) for rad_pix in channels_opening_radius_pix]
 
     new_bkgds = []
     for i in range(len(channels)) :

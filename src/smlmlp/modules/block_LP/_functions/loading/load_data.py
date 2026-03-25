@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 # %% Function
 @block()
-def load_data(*tif_paths, chunk=None, pad=0, bbox=None, memmap=True, flip=None, iterator=range) :
+def load_data(*tif_paths, chunk=None, pad=0, cameras_bbox=None, memmap=True, flip=None, iterator=range) :
     '''
     This generator loads SMLM raw data in chunks from various tif files.
     '''
@@ -29,8 +29,8 @@ def load_data(*tif_paths, chunk=None, pad=0, bbox=None, memmap=True, flip=None, 
         shapes = [shapetif(tif) for tif in tifs]
         nfiles = len(tifs)
         if nfiles < 1 : raise SyntaxError('Must define at least one tiff file to load')
-        if bbox is None : bbox = [[(0, 0, shape[2], shape[1]),] for shape in shapes]
-        nchannels = [len(box) for box in bbox]
+        if cameras_bbox is None : cameras_bbox = [[(0, 0, shape[2], shape[1]),] for shape in shapes]
+        nchannels = [len(box) for box in cameras_bbox]
         if len(nchannels) != nfiles : raise ValueError('Did not give the same amount of bbox as files')
 
         # Check number of frames
@@ -111,7 +111,7 @@ def load_data(*tif_paths, chunk=None, pad=0, bbox=None, memmap=True, flip=None, 
             # Make channel views
             channels = []
             count = 0
-            for load, mmap, box in zip(loads, mmaps_chunks, bbox) :
+            for load, mmap, box in zip(loads, mmaps_chunks, cameras_bbox) :
                 for bb in box :
                     # bb = (x0, y0, x1, y1) slicing --> [y0:y1, x0:x1]
                     x0, y0, x1, y1 = bb

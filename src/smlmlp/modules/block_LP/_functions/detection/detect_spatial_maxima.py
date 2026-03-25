@@ -17,7 +17,7 @@ import math
 
 # %% Function
 @block()
-def detect_spatial_maxima(snrs, /, snr_thresh, spatial_kernel, *, pad=0, f0=0, channel_pixel=1., cuda=False, parallel=False) :
+def detect_spatial_maxima(snrs, /, snr_thresh, channels_spatial_kernels, *, pad=0, f0=0, channels_pixels_nm=1., cuda=False, parallel=False) :
     '''
     This function finds local maxima in thresholded areas.
     '''
@@ -27,13 +27,13 @@ def detect_spatial_maxima(snrs, /, snr_thresh, spatial_kernel, *, pad=0, f0=0, c
 
     # footprint
     k_fp = math.exp(-(0.47/0.21)**2 / 2) # Sparrow limit: 0.47 wl / NA, Gaussian 0.21 wl / NA
-    footprints = [kernel > kernel.max() * k_fp for kernel in spatial_kernel]
+    footprints = [kernel > kernel.max() * k_fp for kernel in channels_spatial_kernels]
     
     # Get pixel
-    pixels = Config(nfiles=len(snrs), pixel=channel_pixel).pixel
+    channels_pixels_nm = Config(ncameras=len(snrs), channels_cameras_nm=channels_pixels_nm).channels_cameras_nm
 
     F, X, Y, C = [], [], [], []
-    for pos, (snr, footprint, pixel) in enumerate(zip(snrs, footprints, pixels)) :
+    for pos, (snr, footprint, pixel) in enumerate(zip(snrs, footprints, channels_pixels_nm)) :
         snr = xp.asarray(snr)
         footprint = xp.asarray(footprint)
 
@@ -129,7 +129,7 @@ def maxi_cpu(mask, snr, snr_thresh, footprint):
 
 @nb.njit(parallel=True, nogil=True, cache=True, fastmath=True)
 def com_cpu(snr, fr_idx, y_idx, x_idx, y_out, x_out):
-    n = len(f_idx)
+    n = len(fr_idx)
 
     F, Y, X = snr.shape
 

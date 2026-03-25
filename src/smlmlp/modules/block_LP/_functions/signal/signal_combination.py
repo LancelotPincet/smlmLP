@@ -13,7 +13,7 @@ from arrlp import gc
 
 # %% Function
 @block(timeit=False)
-def signal_combination(channels, /, spatial_kernel=None, temporal_kernel=None, signals=None, bkgds=None, noise_corrections=None, *, do_spatial_filter=True, do_temporal_filter=False, cuda=False, parallel=False) :
+def signal_combination(channels, /, channels_spatial_kernels=None, temporal_kernel=None, signals=None, bkgds=None, noise_corrections=None, *, do_spatial_filter=True, do_temporal_filter=False, cuda=False, parallel=False) :
     '''
     This function creates the spatial local mean background.
     '''
@@ -22,9 +22,9 @@ def signal_combination(channels, /, spatial_kernel=None, temporal_kernel=None, s
     buffers = None
 
     if do_spatial_filter :
-        assert spatial_kernel is not None
+        assert channels_spatial_kernels is not None
         gc()
-        signals, noise_corrections = signal_spatial_filter(channels, spatial_kernel, signals=signals, noise_corrections=noise_corrections, bkgds=bkgds, cuda=cuda, parallel=parallel)
+        signals, noise_corrections = signal_spatial_filter(channels, channels_spatial_kernels, signals=signals, noise_corrections=noise_corrections, bkgds=bkgds, cuda=cuda, parallel=parallel)
         if buffers is None :
             buffers = [signal.copy() for signal in signals]
         else :

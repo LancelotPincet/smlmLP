@@ -16,7 +16,7 @@ import math
 
 # %% Function
 @block()
-def detect_snr(signals, bkgds, noise_corrections=None, channel_gain=0.25, *, cuda=False, parallel=False) :
+def detect_snr(signals, bkgds, noise_corrections=None, channels_gains=0.25, *, cuda=False, parallel=False) :
     '''
     This function normalizes the signals into SNRs.
     '''
@@ -25,7 +25,7 @@ def detect_snr(signals, bkgds, noise_corrections=None, channel_gain=0.25, *, cud
     xp = get_xp(cuda)
 
     # lists
-    gains = Config(nfiles=len(signals), gain_experimental=channel_gain).gain
+    channels_gains = Config(ncameras=len(signals), gain_experimental=channels_gains).channels_gains
     if noise_corrections is None :
         noise_corrections = [xp.float32(1.) for _ in range(len(signals))]
 
@@ -34,7 +34,7 @@ def detect_snr(signals, bkgds, noise_corrections=None, channel_gain=0.25, *, cud
         signal = xp.asarray(signals[i], dtype=xp.float32)
         bkgd = xp.asarray(bkgds[i], dtype=xp.float32)
         noise_correction = xp.float32(noise_corrections[i])
-        gain = xp.float32(gains[i])
+        gain = xp.float32(channels_gains[i])
 
         # Calculating SNR
         if cuda :

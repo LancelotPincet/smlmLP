@@ -20,9 +20,9 @@ class Camera :
         ("nchannels", "Cameras"),
         ("npixels", "Cameras"),
         ("bits", "Cameras"),
-        ("pixel", "Cameras"),
-        ("gain_constructor", "Cameras"),
-        ("gain_experimental", "Backgrounds"),
+        ("pixel_nm", "Cameras"),
+        ("constructor_gain", "Cameras"),
+        ("experimental_gain", "Backgrounds"),
         ("QE", "Cameras"),
         ]
     properties = ['camera_index', 'gain']
@@ -37,7 +37,7 @@ class Camera :
     # Channels
     @property
     def camera_index(self) :
-        for i in range(self.config.nfiles) :
+        for i in range(self.config.ncameras) :
             if self.config.cameras[i] is self :
                 return i
 
@@ -66,7 +66,7 @@ class Camera :
         return 2304
 
     @prop(iterable=2, dtype=float)
-    def pixel(self) : # (y, x) [nm]
+    def pixel_nm(self) : # (y, x) [nm]
         return 100.
 
 
@@ -86,14 +86,14 @@ class Camera :
     # Photons counting
     @property
     def gain(self) :
-        return self.gain_experimental if self.gain_experimental is not None else self.gain_constructor
+        return self.experimental_gain if self.experimental_gain is not None else self.constructor_gain
 
     @prop(dtype=float)
-    def gain_constructor(self) : # e-/ADU (Analog to Digital Unit)
+    def constructor_gain(self) : # e-/ADU (Analog to Digital Unit)
         return 0.25
 
     @prop(dtype=float)
-    def gain_experimental(self) : # e-/ADU (Analog to Digital Unit)
+    def experimental_gain(self) : # e-/ADU (Analog to Digital Unit)
         return None
 
     @prop(dtype=float)
@@ -103,7 +103,7 @@ class Camera :
 
 
     @property
-    def FOV_max(self) : # (y, y) [µm]
+    def FOV_max_um(self) : # (y, y) [µm]
         ny, nx = self.npixels
         match self.nchannels :
             case 1 : # Full frame
@@ -119,11 +119,11 @@ class Camera :
                 ny = ny - ny%2 # Make it even
                 nx, ny = nx // 2, ny // 2
             case _ : raise ValueError('Dividing a camera image into more than 4 channels is not supported.')
-        return int(ny) * self.pixel[0] * 1e-3, int(nx) * self.pixel[1] * 1e-3
+        return int(ny) * self.pixel_nm[0] * 1e-3, int(nx) * self.pixel_nm[1] * 1e-3
 
     def FOV2bbox(self, FOV) : # (x0, y0, x1, y1)
         ny, nx = self.npixels # total number of pixels in frames
-        sy, sx = int(FOV[0] * 1e3 / self.pixel[0]), int(FOV[1] * 1e3 / self.pixel[1]) # shape of each channel
+        sy, sx = int(FOV[0] * 1e3 / self.pixel_nm[0]), int(FOV[1] * 1e3 / self.pixel_nm[1]) # shape of each channel
         match self.nchannels:
             case 1: # Center a single crop
                 x0 = (nx - sx) // 2

@@ -14,13 +14,20 @@ import numpy as np
 
 # %% Function
 @block()
-def bkgd_spatial_mean(channels, /, mean_radius=7, bkgds=None, noise_corrections=None, *, channel_pixel=1., cuda=False, parallel=False) :
+def bkgd_spatial_mean(channels, /, channel_mean_radius_pix=7., bkgds=None, noise_corrections=None, *, cuda=False, parallel=False) :
     '''
     This function creates the spatial local mean background.
     '''
 
-    # Get pixel
-    channel_pixel = Config(nfiles=len(channels), pixel=channel_pixel).pixel
+    # Get channel_mean_radius_pix
+    try :
+        if len(channel_mean_radius_pix) != len(channels) :
+            if len(channel_mean_radius_pix) == 2 :
+                channel_mean_radius_pix = [channel_mean_radius_pix for _ in range(len(channels))]
+            else :
+                raise ValueError('channel_mean_radius_pix does not have the same length as channels')
+    except TypeError:
+        channel_mean_radius_pix = [(channel_mean_radius_pix, channel_mean_radius_pix) for _ in range(len(channels))]
 
     # Correct bkgd length for end of acquisition
     if bkgds is not None and len(bkgds[0]) > len(channels[0]):
@@ -34,9 +41,10 @@ def bkgd_spatial_mean(channels, /, mean_radius=7, bkgds=None, noise_corrections=
     for i in range(len(channels)) :
         bkgd = None if bkgds is None else bkgds[i]
         channel = channels[i]
-        new_bkgd = img_gaussianfilter(channel, sigma=mean_radius/2, pixel=channel_pixel[i], out=bkgd, cuda=cuda, parallel=parallel, stacks=True)
-        k1 = -kernel(ndims=1, pixel=channel_pixel[i][0], sigma=mean_radius/2)
-        k2 = -kernel(ndims=1, pixel=channel_pixel[i][1], sigma=mean_radius/2)
+        sigma = channel_mean_radius_pix[i][0] / 2, channel_mean_radius_pix[i][1] / 2
+        new_bkgd = img_gaussianfilter(channel, sigma=sigma, out=bkgd, cuda=cuda, parallel=parallel, stacks=True)
+        k1 = -kernel(ndims=1, sigma=sigma[0])
+        k2 = -kernel(ndims=1, sigma=sigma[1])
         k1[int(len(k1)//2)] += 1.
         k2[int(len(k2)//2)] += 1.
         noise_corrections[i] *= np.sqrt(np.sum(k1**2)) * np.sqrt(np.sum(k2**2))

@@ -14,7 +14,7 @@ import numpy as np
 
 # %% Function
 @block()
-def signal_spatial_filter(channels, /, spatial_kernel, signals=None, bkgds=None, noise_corrections=None, *, cuda=False, parallel=False) :
+def signal_spatial_filter(channels, /, channels_spatial_kernels, signals=None, bkgds=None, noise_corrections=None, *, cuda=False, parallel=False) :
     '''
     This function applyies a spatial filter to enhance signal.
     '''
@@ -35,7 +35,7 @@ def signal_spatial_filter(channels, /, spatial_kernel, signals=None, bkgds=None,
         if bkgd is not None :
             channel = channel - bkgd
         if signal is channel : signal = None
-        kernel = spatial_kernel[i]
+        kernel = channels_spatial_kernels[i]
         new_signal = img_correlate(channel, kernel=kernel, out=signal, cuda=cuda, parallel=parallel, stacks=True)
         noise_corrections[i] *= np.sqrt(np.sum(kernel**2))
         new_signals.append(new_signal)

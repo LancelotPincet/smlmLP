@@ -17,7 +17,7 @@ from scipy.optimize import curve_fit
 
 # %% Function
 @block()
-def blink_temporal_on(channels, /, crop=None, psf_sigma=1., *, exposure=1., channel_pixel=1., cuda=False, parallel=False) :
+def blink_temporal_on(channels, crop_fr=None, /, psf_sigma_nm=100., *, exposure_ms=50., channels_pixels_nm=100., cuda=False, parallel=False) :
     '''
     This function creates the temporal autocorrelation for on time measurements.
     '''
@@ -26,23 +26,23 @@ def blink_temporal_on(channels, /, crop=None, psf_sigma=1., *, exposure=1., chan
     xp = get_xp(cuda)
 
     # Get pixel
-    pixel = Config(nfiles=len(channels), pixel=channel_pixel).pixel
+    channels_pixels_nm = Config(ncameras=len(channels), cameras_pixels_nm=channels_pixels_nm).cameras_pixels_nm
     
     # Get coordinates
-    if crop is None: crop = int(len(channels) // 2 - 1)
-    T = np.arange(crop)
-    t = T * exposure
+    if crop_fr is None: crop_fr = int(len(channels) // 2 - 1)
+    T = np.arange(crop_fr)
+    t = T * exposure_ms
 
     results = {'ac': []}
-    for i, (channel, pix) in enumerate(zip(channels, pixel)) :
+    for i, (channel, pix) in enumerate(zip(channels, channels_pixels_nm)) :
 
         # Calculating autocorrelation
         gc()
-        bkgd = img_gaussianfilter(channel, sigma=psf_sigma[i] * 3, pixel=pix, cuda=cuda, parallel=parallel)
+        bkgd = img_gaussianfilter(channel, sigma=psf_sigma_nm[i] * 3, pixel=pix, cuda=cuda, parallel=parallel)
         bkgd = xp.minimum(bkgd, channel)
         channel = channel - bkgd
         f0 = int(channel.shape[0]//2)
-        ac = stack_autocorr(channel, cuda=cuda, parallel=parallel)[f0 + 1: f0 + 1 + crop]
+        ac = stack_autocorr(channel, cuda=cuda, parallel=parallel)[f0 + 1: f0 + 1 + crop_fr]
         ac = ac.mean(axis=(1,2))
         ac -= ac[-1]
         ac /= ac[0]
@@ -65,6 +65,6 @@ def blink_temporal_on(channels, /, crop=None, psf_sigma=1., *, exposure=1., chan
     tau, offset = popt
     results['fit'] = func2fit(T, *popt)
     results['time'] = t
-    on_time = tau * exposure # ms
+    on_time = tau * exposure_ms # ms
 
     return on_time, results

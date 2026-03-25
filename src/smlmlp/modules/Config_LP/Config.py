@@ -52,7 +52,7 @@ class Config() :
     def __init__(self, *tif_paths, config=None, **kwargs) :
 
         # Opening tif files
-        self.nfiles = len(tif_paths)
+        self.ncameras = max(len(tif_paths), 1)
 
         # Loading previous configuration
         if config is not None :
@@ -87,7 +87,7 @@ class Config() :
                 if shape[0] != shapes[0][0] :
                     raise ValueError('All tiff files do not have the same number of frames which is not possible for a single SMLM acquisition')
             self.nframes = shapes[0][0]
-            self.npixels = [shape[1:3] for shape in shapes]
+            self.cameras_npixels = [shape[1:3] for shape in shapes]
 
 
 
@@ -127,24 +127,24 @@ class Config() :
     # Cameras
 
     @metadatum('Cameras')
-    def nfiles(self) :
+    def ncameras(self) :
         raise SyntaxError('Should not be called')
-    @nfiles.setter
-    def nfiles(self, value) :
+    @ncameras.setter
+    def ncameras(self, value) :
         self.cameras = [Camera(self) for _ in range(int(value))]
     @property
-    def _nfiles(self) :
+    def _ncameras(self) :
         return len(self.cameras)
 
     @property
-    def FOV_max(self) :
-        ymin = min([camera.FOV_max[0] for camera in self.cameras])
-        xmin = min([camera.FOV_max[1] for camera in self.cameras])
+    def FOV_max_um(self) :
+        ymin = min([camera.FOV_max_um[0] for camera in self.cameras])
+        xmin = min([camera.FOV_max_um[1] for camera in self.cameras])
         return ymin, xmin
 
     @property
-    def bbox(self) :
-        FOV = self.FOV_max
+    def cameras_bbox(self) :
+        FOV = self.FOV_max_um
         return [camera.FOV2bbox(FOV) for camera in self.cameras]
     @property
     def frame_bytes(self) : # gigabytes/frame
@@ -155,8 +155,8 @@ class Config() :
     # Channels
 
     @property
-    def total_nchannels(self) :
-        return sum(self.nchannels)
+    def nchannels(self) :
+        return sum(self.cameras_nchannels)
 
     @property
     def channels(self) :
@@ -175,11 +175,11 @@ class Config() :
     # Time
 
     @metadatum('Cameras', dtype=float)
-    def exposure(self) : # [ms]
+    def exposure_ms(self) : # [ms]
         return 50.
 
     @metadatum('Blinks')
-    def on_time(self) : # ms
+    def on_time_ms(self) : # ms
         return 50.
 
 
@@ -187,24 +187,31 @@ class Config() :
     # Background configurations
 
     @metadatum('Backgrounds', dtype=float)
-    def median_window(self) : # For temporal median [ms]
-        return self.on_time * 10
+    def median_window_ms(self) : # For temporal median [ms]
+        return self.on_time_ms * 10
+    
+    @property
+    def median_window_fr(self) :
+        return int(round(self.median_window_ms / self.exposure_ms))
+    @median_window_fr.setter
+    def median_window_fr(self, value) :
+        self.median_window_ms = value * self.exposure_ms
 
     @metadatum('Backgrounds', dtype=bool)
     def do_temporal_median(self) : # For temporal median
         return True
 
     @metadatum('Backgrounds', dtype=float)
-    def mean_radius(self) : # For spatial mean [nm]
-        return max(self.psf_sigma) * 8
+    def mean_radius_nm(self) : # For spatial mean [nm]
+        return max(self.channels_psf_sigmas_nm) * 8
 
     @metadatum('Backgrounds', dtype=bool)
     def do_spatial_mean(self) : # For spatial mean
         return True
 
     @metadatum('Backgrounds', dtype=float)
-    def opening_radius(self) : # For spatial opening [nm]
-        return max(self.psf_sigma)
+    def opening_radius_nm(self) : # For spatial opening [nm]
+        return max(self.channels_psf_sigmas_nm) * 2
 
     @metadatum('Backgrounds', dtype=bool)
     def do_spatial_opening(self) : # For spatial opening
@@ -240,16 +247,16 @@ class Config() :
 
     @property
     def temporal_kernel_shape(self) :
-        on_frames = self.on_time / self.exposure
+        on_frames = self.on_time_ms / self.exposure_ms
         if self.temporal_subtract_factor > 1 : on_frames *= self.temporal_subtract_factor
         on_frames = int(np.ceil(on_frames))
         return (on_frames * 10 + 1),
 
     @property
     def on_time_kernel(self) :
-        T, = coordinates(shape=self.temporal_kernel_shape, pixel=self.exposure)
+        T, = coordinates(shape=self.temporal_kernel_shape, pixel=self.exposure_ms)
         from funclp import Exponential1
-        exponential = Exponential1(tau=self.on_time)
+        exponential = Exponential1(tau=self.on_time_ms)
         k = exponential(np.abs(T))
         k /= k.sum()
         return k.astype(np.float32)
@@ -257,10 +264,10 @@ class Config() :
     @property
     def temporal_subtract_kernel(self) :
         if self.temporal_subtract_factor <= 1 : return None
-        exposure = self.exposure / self.temporal_subtract_factor
+        exposure = self.exposure_ms / self.temporal_subtract_factor
         T, = coordinates(shape=self.temporal_kernel_shape, pixel=exposure)
         from funclp import Exponential1
-        exponential = Exponential1(tau=self.on_time)
+        exponential = Exponential1(tau=self.on_time_ms)
         k = exponential(np.abs(T))
         k /= k.sum()
         return k.astype(np.float32)
@@ -275,93 +282,120 @@ class Config() :
 
 
     # Detection
+
     @metadatum('Detections')
     def snr_thresh(self) :
         return 4.
 
 
 
+    # Crops
+
+    @metadatum('Crops')
+    def crop_nm(self) : # nm
+        h = max([cz[0] for cz in self.channels_crops_nm])
+        w = max([cz[1] for cz in self.channels_crops_nm])
+        return max(h, w)
+
+
+
+def get_datas(data) :
+    """ adds 's' to data paramter caring for units"""
+    suffix = ''
+    for unit in ['_nm', '_um', '_mm', '_deg', '_rad', '_us', '_ms', '_s', '_pix', '_fr'] :
+        if data.endswith(unit) :
+            data, suffix = data[:-len(unit)], data[-len(unit):]
+            break
+    if not data.endswith('s') and not data.endswith('x') and data[-1].upper() != data[-1] : data = f'{data}s'
+    return data + suffix
+
+
+
 # Adding Camera metadata
 for data, group in Camera.metadata :
-    @metadatum(group, name=data)
+    datas = get_datas(data)
+    @metadatum(group, name=f'cameras_{datas}')
     def camera_property(self, data=data) :
         return [getattr(camera, data) for camera in self.cameras]
     @camera_property.setter
     def camera_property(self, value, data=data) :
         try :
-            if len(value) != self.nfiles : raise ValueError('Value set does not have same number of elements as cameras')
+            if len(value) != self.ncameras : raise ValueError('Value set does not have same number of elements as cameras')
         except TypeError :
-            value = [value for _ in range(self.nfiles)]            
+            value = [value for _ in range(self.ncameras)]            
         for camera, v in zip(self.cameras, value) :
             setattr(camera, data, v)
-    setattr(Config, data, camera_property)
+    setattr(Config, f'cameras_{datas}', camera_property)
     @property
     def _camera_property(self, data=data) :
         value = [getattr(camera, f'_{data}', None) for camera in self.cameras]
         bool_ = [v is None for v in value]
         return None if any(bool_) else value
-    setattr(Config, f'_{data}', _camera_property)
+    setattr(Config, f'_cameras_{datas}', _camera_property)
     @property
     def channel_property(self, data=data) :
         return [getattr(channel, data) for channel in self.channels]
-    setattr(Config, f'channel_{data}', channel_property)
+    setattr(Config, f'channels_{datas}', channel_property)
 
 # Adding Camera properties
 for data in Camera.properties :
+    datas = get_datas(data)
     @property
     def camera_property(self, data=data) :
         return [getattr(camera, data) for camera in self.cameras]
     @camera_property.setter
     def camera_property(self, value, data=data) :
         try :
-            if len(value) != self.nfiles : raise ValueError('Value set does not have same number of elements as cameras')
+            if len(value) != self.ncameras : raise ValueError('Value set does not have same number of elements as cameras')
         except TypeError :
-            value = [value for _ in range(self.nfiles)]            
+            value = [value for _ in range(self.ncameras)]            
         for camera, v in zip(self.cameras, value) :
             setattr(camera, data, v)
-    setattr(Config, data, camera_property)
+    setattr(Config, f'cameras_{datas}', camera_property)
     @property
     def channel_property(self, data=data) :
         return [getattr(channel, data) for channel in self.channels]
-    setattr(Config, f'channel_{data}', channel_property)
+    setattr(Config, f'channels_{datas}', channel_property)
 
 
 
 # Adding Channel metadata
 for data, group in Channel.metadata :
-    @metadatum(group, name=data)
+    datas = get_datas(data)
+    @metadatum(group, name=f'channels_{datas}')
     def channel_property(self, data=data) :
         return [getattr(channel, data) for channel in self.channels]
     @channel_property.setter
     def channel_property(self, value, data=data) :
         try :
-            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
+            if len(value) != self.nchannels : raise ValueError('Value set does not have same number of elements as channels')
         except TypeError :
-            value = [value for _ in range(self.total_nchannels)]     
+            value = [value for _ in range(self.nchannels)]     
         for channel, v in zip(self.channels, value) :
             setattr(channel, data, v)
-    setattr(Config, data, channel_property)
+    setattr(Config, f'channels_{datas}', channel_property)
     @property
     def _channel_property(self, data=data) :
         value = [getattr(channel, f'_{data}', None) for channel in self.channels]
         bool_ = [v is None for v in value]
         return None if any(bool_) else value
-    setattr(Config, f'_{data}', _channel_property)
+    setattr(Config, f'_channels_{datas}', _channel_property)
 
 # Adding Channel properties
 for data in Channel.properties :
+    datas = get_datas(data)
     @property
     def channel_property(self, data=data) :
         return [getattr(channel, data) for channel in self.channels]
     @channel_property.setter
     def channel_property(self, value, data=data) :
         try :
-            if len(value) != self.total_nchannels : raise ValueError('Value set does not have same number of elements as channels')
+            if len(value) != self.nchannels : raise ValueError('Value set does not have same number of elements as channels')
         except TypeError :
-            value = [value for _ in range(self.total_nchannels)]     
+            value = [value for _ in range(self.nchannels)]     
         for channel, v in zip(self.channels, value) :
             setattr(channel, data, v)
-    setattr(Config, data, channel_property)
+    setattr(Config, f'channels_{datas}', channel_property)
 
 
 

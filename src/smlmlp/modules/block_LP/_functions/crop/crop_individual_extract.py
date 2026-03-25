@@ -16,7 +16,7 @@ from numba import cuda as nb_cuda
 
 # %% Function
 @block()
-def crop_individual_extract(channels, /, fr, x, y, ch=None, *, crop_size=11, channel_pixel=1., cuda=False, parallel=False) :
+def crop_individual_extract(channels, /, fr, x, y, ch=None, *, channels_crops_pix=11, cuda=False, parallel=False) :
     '''
     This function creates the spatial local mean background.
     '''
@@ -29,9 +29,14 @@ def crop_individual_extract(channels, /, fr, x, y, ch=None, *, crop_size=11, cha
         ch = np.zeros_like(fr, dtype=np.uint8)
 
     # Get pixel
-    fake_config = Config(nfiles=len(channels), pixel=channel_pixel, crop_size=crop_size)
-    channel_pixel = fake_config.pixel
-    crop_size = fake_config.crop_size
+    channels_pixels_nm = Config(ncameras=len(channels), cameras_pixels_nm=channels_pixels_nm).cameras_pixels_nm
+
+    # Get crop_pix
+    try :
+        if len(channels_crops_pix) != len(channels) :
+            raise ValueError('crop_pix does not have the same length as channels')
+    except TypeError :
+        channels_crops_pix = [channels_crops_pix for _ in range(len(channels))]
 
     # Sort
     xp = get_xp(cuda)
@@ -45,9 +50,8 @@ def crop_individual_extract(channels, /, fr, x, y, ch=None, *, crop_size=11, cha
     crops, X0, Y0 = [], [], []
     for ch_ch, ch_fr, ch_y, ch_x in sortloop(ch, fr, y, x) :
         channel = channels[ch_ch[0]]
-        pixel = channel_pixel[ch_ch[0]]
-        size = crop_size[ch_ch[0]]
-        width, height = int(np.ceil(size[0] / pixel[0])), int(np.ceil(size[1] / pixel[1]))
+        pixel = channels_pixels_nm[ch_ch[0]]
+        width, height = channels_crops_pix[ch_ch[0]]
         n = len(ch_ch)
         crop = xp.empty(shape=(n, height, width), dtype=np.float32)
         x0_pix = xp.empty(shape=n, dtype=np.uint16)
