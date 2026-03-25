@@ -18,6 +18,7 @@ anaconda = [ "ipykernel", "spyder-kernels",]
 [project.optional-dependencies]
 cuda12 = [ "arrlp[cuda12]", "stacklp[cuda12]", "funclp[cuda12]",]
 cuda13 = [ "arrlp[cuda13]", "stacklp[cuda13]", "funclp[cuda13]",]
+docs = [ "sphinx", "sphinx-design", "sphinx-rtd-theme", "toml",]
 
 [tool.uv]
 required-environments = [ "sys_platform == 'linux' and platform_machine == 'x86_64'", "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'x86_64')",]
