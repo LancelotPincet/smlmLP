@@ -72,7 +72,7 @@ class Locs(LocsDataFrame) :
         # Config
         if config is not None :
             self.config_source = config
-        self.config = Config(config=self.config_source, **self.config_kwargs)
+        self.config = config if isinstance(config, Config) else Config(config=self.config_source, **self.config_kwargs)
 
     # Config
     @prop()
@@ -85,7 +85,7 @@ class Locs(LocsDataFrame) :
         self._config_source = value
     @property
     def config_kwargs(self) :
-        return dict(nfiles=1) if self.config_source is None else dict()
+        return dict(ncameras=1) if self.config_source is None else dict()
 
     # Detections properties
     @property
@@ -97,11 +97,13 @@ class Locs(LocsDataFrame) :
 
 
     def filter(self, *filter_names, mask=None) :
-        filters = [getattr(self, name, None) for name in filter_names]
+        filters = [getattr(self.detections, name, None) for name in filter_names]
         if mask is not None : filters += [mask]
         mask = np.logical_and.reduce(filters)
-        self.keep = mask
-        df_list = [df[mask].drop(columns=[columns[name].header for name in filter_names if columns[name].header in df]) for df in self.df_dict.values()]
+        self.detections.keep = mask
+        df_list = [df.loc[getattr(df, 'keep')] for df in self.df_dict.values()]
+        for df in df_list :
+            df.drop(columns=['filter'], inplace=True)
         return Locs(df_list, config=self.config)
 
 

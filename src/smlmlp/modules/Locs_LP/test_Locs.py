@@ -55,6 +55,10 @@ def test_function() :
     locs.save(path)
     locs2 = Locs(path)
 
+    # Filter
+    mask = locs.detections.xdet > 50
+    locs3 = locs.filter(mask=mask)
+    
 
 
 # %% Test function run

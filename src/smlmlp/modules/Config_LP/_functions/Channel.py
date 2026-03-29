@@ -29,7 +29,7 @@ class Channel :
         ("psf_ytangents", "Data"),
         ("psf_spline_coeffs", "Data"),
         ]
-    properties = ["psf_sigma_nm", "psf_radius_nm", "psf_diameter_nm", "psf_fwhm_nm", "spatial_kernel", "spatial_kernel_shape", "default_crop_nm", "crop_pix"]
+    properties = ["psf_sigma_nm", "psf_radius_nm", "psf_diameter_nm", "psf_fwhm_nm", "spatial_kernel", "spatial_kernel_shape", "psf_kernel", "default_crop_nm", "crop_pix"]
 
 
 
@@ -173,13 +173,13 @@ class Channel :
 
     # Crops
 
-    @prop(iterable=2, dtype=int)
+    @property
     def default_crop_nm(self) : # nm
-        h = self.psf_ysigma_nm / self.pixel_nm[0] * 12
-        w = self.psf_xsigma_nm / self.pixel_nm[1] * 12
+        h = self.psf_ysigma_nm / self.pixel_nm[0] * 8
+        w = self.psf_xsigma_nm / self.pixel_nm[1] * 8
         return int(2*(h//2)+1) * self.pixel_nm[0], int(2*(w//2)+1) * self.pixel_nm[1]
 
-    @prop(iterable=2, dtype=int)
+    @property
     def crop_pix(self) : # pixel
         crop_nm = self.camera.config.crop_nm
         h = crop_nm / self.pixel_nm[0]

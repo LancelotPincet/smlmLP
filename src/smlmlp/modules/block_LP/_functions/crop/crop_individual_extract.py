@@ -16,7 +16,7 @@ from numba import cuda as nb_cuda
 
 # %% Function
 @block()
-def crop_individual_extract(channels, /, fr, x, y, ch=None, *, channels_crops_pix=11, cuda=False, parallel=False) :
+def crop_individual_extract(channels, /, fr, x, y, ch=None, *, channels_crops_pix=11, channels_pixels_nm=100., cuda=False, parallel=False) :
     '''
     This function creates the spatial local mean background.
     '''
@@ -28,31 +28,46 @@ def crop_individual_extract(channels, /, fr, x, y, ch=None, *, channels_crops_pi
             raise SyntaxError("Cannot apply crop extracting on several channels without defining channel vector")
         ch = np.zeros_like(fr, dtype=np.uint8)
 
-    # Get pixel
-    channels_pixels_nm = Config(ncameras=len(channels), cameras_pixels_nm=channels_pixels_nm).cameras_pixels_nm
-
     # Get crop_pix
     try :
         if len(channels_crops_pix) != len(channels) :
-            raise ValueError('crop_pix does not have the same length as channels')
-    except TypeError :
-        channels_crops_pix = [channels_crops_pix for _ in range(len(channels))]
+            if len(channels_crops_pix) == 2 :
+                channels_crops_pix = [channels_crops_pix for _ in range(len(channels))]
+            else :
+                raise ValueError('channels_crops_pix does not have the same length as channels')
+    except TypeError:
+        channels_crops_pix = [(channels_crops_pix, channels_crops_pix) for _ in range(len(channels))]
+
+    # Get channels_pixels_nm
+    try :
+        if len(channels_pixels_nm) != len(channels) :
+            if len(channels_pixels_nm) == 2 :
+                channels_pixels_nm = [channels_pixels_nm for _ in range(len(channels))]
+            else :
+                raise ValueError('channels_pixels_nm does not have the same length as channels')
+    except TypeError:
+        channels_pixels_nm = [(channels_pixels_nm, channels_pixels_nm) for _ in range(len(channels))]
 
     # Sort
     xp = get_xp(cuda)
-    argsort = xp.lexsort((x, y, fr, ch))
-    fr = xp.asarray(fr[argsort]-1, dtype=xp.uint32)
-    y = xp.asarray(y[argsort], dtype=xp.float32)
-    x = xp.asarray(x[argsort], dtype=xp.float32)
-    ch = xp.asarray(ch[argsort], dtype=xp.uint8)
+    fr = xp.asarray(fr, dtype=xp.uint32)
+    y = xp.asarray(y, dtype=xp.float32)
+    x = xp.asarray(x, dtype=xp.float32)
+    ch = xp.asarray(ch, dtype=xp.uint8)
+    keys = xp.stack((x, y, fr, ch))
+    argsort = xp.lexsort(keys)
+    fr = fr[argsort]-1
+    y = y[argsort]
+    x = x[argsort]
+    ch = ch[argsort]
 
     # Looping on channels
     crops, X0, Y0 = [], [], []
-    for ch_ch, ch_fr, ch_y, ch_x in sortloop(ch, fr, y, x) :
-        channel = channels[ch_ch[0]]
-        pixel = channels_pixels_nm[ch_ch[0]]
-        width, height = channels_crops_pix[ch_ch[0]]
-        n = len(ch_ch)
+    for _, ch_ch, ch_fr, ch_y, ch_x in sortloop(ch, fr, y, x, cuda=cuda) :
+        channel = channels[ch_ch]
+        pixel = channels_pixels_nm[ch_ch]
+        width, height = channels_crops_pix[ch_ch]
+        n = len(ch_fr)
         crop = xp.empty(shape=(n, height, width), dtype=np.float32)
         x0_pix = xp.empty(shape=n, dtype=np.uint16)
         y0_pix = xp.empty(shape=n, dtype=np.uint16)

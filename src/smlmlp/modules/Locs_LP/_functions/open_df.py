@@ -33,6 +33,8 @@ def open_df(locs, df) :
             warn(f'Skipping opening unknown column with header "{header}"')
         col = columns.headers[header]
         col_name = col.col
+        mine = getattr(dataframe, f'{col_name}_mine')
+        if not mine : continue
         dtype = col.dtype
         array = df[header].to_numpy().astype(dtype)
         setattr(dataframe, col_name, array)

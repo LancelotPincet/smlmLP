@@ -293,8 +293,8 @@ class Config() :
 
     @metadatum('Crops')
     def crop_nm(self) : # nm
-        h = max([cz[0] for cz in self.channels_crops_nm])
-        w = max([cz[1] for cz in self.channels_crops_nm])
+        h = max([cz[0] for cz in self.channels_default_crops_nm])
+        w = max([cz[1] for cz in self.channels_default_crops_nm])
         return max(h, w)
 
 

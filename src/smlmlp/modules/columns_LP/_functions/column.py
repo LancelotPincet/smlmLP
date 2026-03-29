@@ -93,6 +93,15 @@ class column() :
             return self
         setattr(self.cls, f'_{self.col}', _col)
 
+        # Belongs
+        if self.index or issubclass(self.cls, MainDataFrame) :
+            setattr(MainDataFrame, f'{self.col}_mine', True)
+            setattr(DataFrame, f'{self.col}_mine', False)
+        else :
+            setattr(MainDataFrame, f'{self.col}_mine', False)
+            setattr(DataFrame, f'{self.col}_mine', True)
+            
+
         # Set on MainDataFrame
         if issubclass(self.cls, MainDataFrame) :
             @property
@@ -103,6 +112,7 @@ class column() :
                 return df[self.header].to_numpy()
             if hasattr(DataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in DataFrame')
             setattr(DataFrame, self.col, merged_col)
+
         
         # Set on DataFrame
         else :
