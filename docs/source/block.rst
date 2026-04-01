@@ -3,15 +3,15 @@ smlmlp.block module
 
 .. autofunction:: smlmlp.block
 
-Globlocalization
-----------------
+Localization
+------------
 
 .. toctree::
    :maxdepth: 1
 
 
-Registration
-------------
+Globlocalization
+----------------
 
 .. toctree::
    :maxdepth: 1
@@ -24,15 +24,42 @@ Globdetection
    :maxdepth: 1
 
 
+Photon
+------
+
+.. toctree::
+   :maxdepth: 1
+
+
+Signal
+------
+
+.. toctree::
+   :maxdepth: 1
+
+   signal_temporal_filter
+   signal_combination
+   signal_spatial_filter
+
+Detection
+---------
+
+.. toctree::
+   :maxdepth: 1
+
+   detect_spatial_maxima
+   detect_gain
+   detect_snr
+
 Background
 ----------
 
 .. toctree::
    :maxdepth: 1
 
-   bkgd_spatial_mean
    bkgd_spatial_opening
    bkgd_combination
+   bkgd_spatial_mean
    bkgd_temporal_median
 
 Crop
@@ -43,33 +70,8 @@ Crop
 
    crop_individual_extract
 
-Loading
--------
-
-.. toctree::
-   :maxdepth: 1
-
-   load_data
-
-Signal
-------
-
-.. toctree::
-   :maxdepth: 1
-
-   signal_spatial_filter
-   signal_combination
-   signal_temporal_filter
-
-Localization
+Registration
 ------------
-
-.. toctree::
-   :maxdepth: 1
-
-
-Photon
-------
 
 .. toctree::
    :maxdepth: 1
@@ -81,15 +83,13 @@ Blink
 .. toctree::
    :maxdepth: 1
 
-   blink_spatial_psf
    blink_temporal_on
+   blink_spatial_psf
 
-Detection
----------
+Loading
+-------
 
 .. toctree::
    :maxdepth: 1
 
-   detect_spatial_maxima
-   detect_gain
-   detect_snr
+   load_data
