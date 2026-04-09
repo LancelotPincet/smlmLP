@@ -14,7 +14,7 @@ This class define objects corresponding to localizations sets for one experiment
 
 # %% Libraries
 from corelp import folder, selfkwargs, prop
-from smlmlp import open_df, save_df, LocsDataFrame, DetsDataFrame, Config, columns
+from smlmlp import open_df, save_df, LocsDataFrame, DetsDataFrame, Config
 from pathlib import Path
 import pandas as pd
 import numpy as np

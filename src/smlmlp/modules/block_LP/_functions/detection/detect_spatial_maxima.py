@@ -17,7 +17,7 @@ import math
 
 # %% Function
 @block()
-def detect_spatial_maxima(snrs, /, snr_thresh, channels_spatial_kernels, *, pad=0, f0=0, channels_pixels_nm=1., cuda=False, parallel=False) :
+def detect_spatial_maxima(snrs, /, snr_thresh, channels_spatial_kernels, *, f0=0, channels_pixels_nm=1., cuda=False, parallel=False) :
     '''
     This function finds local maxima in thresholded areas.
     '''
@@ -166,7 +166,7 @@ def com_cpu(snr, fr_idx, y_idx, x_idx, y_out, x_out):
 
 
 
-@nb_cuda.jit
+@nb_cuda.jit(fastmath=True, cache=True)
 def det_gpu(snr, snr_thresh, footprint, fr_out, y_out, x_out, counter):
     fr, y, x = nb_cuda.grid(3)
 

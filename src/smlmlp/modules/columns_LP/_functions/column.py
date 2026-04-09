@@ -119,9 +119,14 @@ class column() :
             if self.index :
                 @property
                 def index_col(dets) :
-                    if self.header not in dets.columns :
-                        return None
-                    return dets[self.header].to_numpy()
+                    if self.header in dets.columns :
+                        return dets[self.header].to_numpy()
+                    instance = getattr(dets.locs, f'{self.col}s') # instance of dataframe whom index this is
+                    newcol = self.func(instance)
+                    if newcol is None : return None
+                    if isinstance(newcol, str) : return getattr(instance, newcol) # Substitute
+                    setattr(dets, self.col, newcol) # Calculated
+                    return getattr(dets, self.col) 
                 @index_col.setter
                 def index_col(dets, value) :
                     if value is None :

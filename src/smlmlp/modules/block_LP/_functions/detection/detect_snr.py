@@ -54,7 +54,7 @@ def snr_cpu(signal, bkgd, noise_correction, gain) :
 
 
 
-@nb_cuda.jit(fastmath=True)
+@nb_cuda.jit(fastmath=True, cache=True)
 def snr_gpu(signal, bkgd, noise_correction, gain) :
     i = nb_cuda.grid(1)
     if i < len(signal) :

@@ -13,7 +13,7 @@ from arrlp import gc, get_xp
 
 # %% Function
 @block(timeit=False)
-def bkgd_combination(channels, /, bkgds=None, noise_corrections=None, *, do_spatial_opening=False, channels_opening_radius_pix=3., do_temporal_median=True, median_window_fr=25, do_spatial_mean=True, channel_mean_radius_pix=7., cuda=False, parallel=False) :
+def bkgd_combination(channels, /, bkgds=None, noise_corrections=None, *, do_spatial_opening=False, channels_opening_radius_pix=3., do_temporal_median=True, median_window_fr=25, do_spatial_mean=True, channels_mean_radius_pix=7., cuda=False, parallel=False) :
     '''
     This function creates the spatial local mean background.
     '''
@@ -43,7 +43,7 @@ def bkgd_combination(channels, /, bkgds=None, noise_corrections=None, *, do_spat
                 xp.subtract(channels[i], bkgds[i], buffers[i])
     if do_spatial_mean :
         gc()
-        bkgds, noise_corrections = bkgd_spatial_mean(channels, channel_mean_radius_pix=channel_mean_radius_pix, noise_corrections=noise_corrections, bkgds=bkgds, cuda=cuda, parallel=parallel)
+        bkgds, noise_corrections = bkgd_spatial_mean(channels, channels_mean_radius_pix=channels_mean_radius_pix, noise_corrections=noise_corrections, bkgds=bkgds, cuda=cuda, parallel=parallel)
         if buffers is None :
             channels = [channel - bkgd for channel, bkgd in zip(channels, bkgds)]
             buffers = channels

@@ -19,8 +19,24 @@ class MainDataFrame(pd.DataFrame) : # This class is here to host dynamic main da
     def __init__(self, locs) :
         if self.index_name is None : raise SyntaxError(f'DataFrame {self.__class__} should have an index name defined via @column decorator')
         self.locs = locs
-        pd.DataFrame.__init__(self)
+        # Empty frame with a 1-based RangeIndex (length 0). Pandas resets to 0..n-1 on the first
+        # column assignment; __setitem__ then rebases to 1..n when appropriate.
+        pd.DataFrame.__init__(self, index=pd.RangeIndex(start=1, stop=1, step=1))
         self.index.name = self.index_name
+
+    def __setitem__(self, key, value) :
+        super().__setitem__(key, value)
+        self._rebase_default_index_to_one()
+
+    def _rebase_default_index_to_one(self) :
+        '''If pandas used a default 0..n-1 RangeIndex, replace it with 1..n.'''
+        idx = self.index
+        n = len(self)
+        if n == 0 or not isinstance(idx, pd.RangeIndex) or idx.step != 1 :
+            return
+        if idx.start == 0 and idx.stop == n :
+            self.index = pd.RangeIndex(start=1, stop=n + 1, step=1)
+            self.index.name = self.index_name
     
     # Attributes
     index_name = None # raise error if stays None
