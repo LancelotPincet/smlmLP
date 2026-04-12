@@ -28,6 +28,11 @@ class Channel :
         ("psf_xtangents", "Data"),
         ("psf_ytangents", "Data"),
         ("psf_spline_coeffs", "Data"),
+        ("x_shift_nm", "Registration"),
+        ("y_shift_nm", "Registration"),
+        ("rotation_deg", "Registration"),
+        ("x_shear", "Registration"),
+        ("y_shear", "Registration"),
         ]
     properties = ["psf_sigma_nm", "psf_radius_nm", "psf_diameter_nm", "psf_fwhm_nm", "spatial_kernel", "spatial_kernel_shape", "psf_kernel", "default_crop_nm", "crop_pix"]
 
@@ -186,6 +191,25 @@ class Channel :
         w = crop_nm / self.pixel_nm[1]
         return int(2*(h//2)+1), int(2*(w//2)+1)
 
+
+
+    # Registration
+
+    @prop()
+    def x_shift_nm(self) : # nm
+        return 0.
+    @prop()
+    def y_shift_nm(self) : # nm
+        return 0.
+    @prop()
+    def rotation_deg(self) : # deg
+        return 0.
+    @prop()
+    def x_shear(self) :
+        return 0.
+    @prop()
+    def y_shear(self) :
+        return 0.
 
 
 # Adding Camera metadata

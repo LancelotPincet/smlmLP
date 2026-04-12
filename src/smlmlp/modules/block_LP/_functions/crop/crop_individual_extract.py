@@ -16,149 +16,277 @@ from numba import cuda as nb_cuda
 
 # %% Function
 @block()
-def crop_individual_extract(channels, /, fr, x, y, ch=None, *, channels_crops_pix=11, channels_pixels_nm=100., cuda=False, parallel=False) :
-    '''
-    This function makes the individual crops from coordinates.
-    '''
-    assert fr.min() >= 1, "Frame column starts at 1 by convention, please add 1 to your column frame before inserting it in this function"
+def crop_individual_extract(
+    channels,
+    /,
+    fr,
+    x,
+    y,
+    ch=None,
+    *,
+    channels_crops_pix=11,
+    channels_pixels_nm=100.0,
+    cuda=False,
+    parallel=False,
+):
+    """
+    Extract individual image crops centered on given coordinates.
 
-    # Correct channels
-    if ch is None :
-        if len(channels) > 1 :
-            raise SyntaxError("Cannot apply crop extracting on several channels without defining channel vector")
+    This function extracts per-event crops from multi-frame image channels
+    using provided frame indices and spatial coordinates. Crops are grouped
+    per channel and computed either on CPU or GPU.
+
+    Parameters
+    ----------
+    channels : sequence of ndarray
+        Sequence of image stacks, one per channel.
+    fr : array-like
+        Frame indices (starting at 1).
+    x, y : array-like
+        Spatial coordinates in nanometers.
+    ch : array-like or None, optional
+        Channel indices for each event. If None, assumes a single channel.
+    channels_crops_pix : int or sequence, optional
+        Crop size in pixels. Can be scalar, (h, w), or per-channel.
+    channels_pixels_nm : float or sequence, optional
+        Pixel size in nanometers. Can be scalar, (y, x), or per-channel values.
+    cuda : bool, optional
+        Whether to use GPU acceleration.
+    parallel : bool, optional
+        Whether to enable CPU parallelization.
+
+    Returns
+    -------
+    tuple
+        A tuple ``(crops, X0, Y0, info)`` where:
+
+        - ``crops`` is a list of arrays containing extracted crops per channel,
+        - ``X0`` is a list of x-origin pixel coordinates,
+        - ``Y0`` is a list of y-origin pixel coordinates,
+        - ``info`` is a dictionary containing reusable intermediate results.
+
+        The dictionary contains the following keys:
+
+        ``'channels_crops_pix'``
+            Normalized per-channel crop sizes.
+        ``'channels_pixels_nm'``
+            Normalized per-channel pixel sizes.
+        ``'argsort'``
+            Sorting indices applied to inputs before processing.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> channel = np.random.rand(10, 32, 32).astype(np.float32)
+    >>> fr = np.array([1, 2, 3])
+    >>> x = np.array([100., 150., 200.])
+    >>> y = np.array([120., 180., 220.])
+    >>> crops, X0, Y0, info = crop_individual_extract([channel], fr, x, y)
+    >>> len(crops)
+    1
+    >>> len(crops[0])
+    3
+    """
+    assert fr.min() >= 1, (
+        "Frame column starts at 1 by convention, please add 1 to your column frame before inserting it in this function"
+    )
+
+    # Handle channel indices
+    if ch is None:
+        if len(channels) > 1:
+            raise SyntaxError(
+                "Cannot apply crop extracting on several channels without defining channel vector"
+            )
         ch = np.zeros_like(fr, dtype=np.uint8)
 
-    # Get crop_pix
-    try :
-        if len(channels_crops_pix) != len(channels) :
-            if len(channels_crops_pix) == 2 :
-                channels_crops_pix = [channels_crops_pix for _ in range(len(channels))]
-            else :
-                raise ValueError('channels_crops_pix does not have the same length as channels')
+    # Normalize crop sizes per channel
+    try:
+        if len(channels_crops_pix) != len(channels):
+            if len(channels_crops_pix) == 2:
+                channels_crops_pix = [
+                    channels_crops_pix for _ in range(len(channels))
+                ]
+            else:
+                raise ValueError(
+                    "channels_crops_pix does not have the same length as channels"
+                )
     except TypeError:
-        channels_crops_pix = [(channels_crops_pix, channels_crops_pix) for _ in range(len(channels))]
+        channels_crops_pix = [
+            (channels_crops_pix, channels_crops_pix)
+            for _ in range(len(channels))
+        ]
 
-    # Get channels_pixels_nm
-    try :
-        if len(channels_pixels_nm) != len(channels) :
-            if len(channels_pixels_nm) == 2 :
-                channels_pixels_nm = [channels_pixels_nm for _ in range(len(channels))]
-            else :
-                raise ValueError('channels_pixels_nm does not have the same length as channels')
+    # Normalize pixel sizes per channel
+    try:
+        if len(channels_pixels_nm) != len(channels):
+            if len(channels_pixels_nm) == 2:
+                channels_pixels_nm = [
+                    channels_pixels_nm for _ in range(len(channels))
+                ]
+            else:
+                raise ValueError(
+                    "channels_pixels_nm does not have the same length as channels"
+                )
     except TypeError:
-        channels_pixels_nm = [(channels_pixels_nm, channels_pixels_nm) for _ in range(len(channels))]
+        channels_pixels_nm = [
+            (channels_pixels_nm, channels_pixels_nm)
+            for _ in range(len(channels))
+        ]
 
-    # Sort
+    # Sorting inputs for efficient grouped processing
     xp = get_xp(cuda)
     fr = xp.asarray(fr, dtype=xp.uint32)
     y = xp.asarray(y, dtype=xp.float32)
     x = xp.asarray(x, dtype=xp.float32)
     ch = xp.asarray(ch, dtype=xp.uint8)
+
     keys = xp.stack((x, y, fr, ch))
     argsort = xp.lexsort(keys)
-    fr = fr[argsort]-1
+
+    fr = fr[argsort] - 1  # convert to 0-based indexing
     y = y[argsort]
     x = x[argsort]
     ch = ch[argsort]
 
-    # Looping on channels
     crops, X0, Y0 = [], [], []
-    for _, ch_ch, ch_fr, ch_y, ch_x in sortloop(ch, fr, y, x, cuda=cuda) :
+
+    # Loop over grouped channels
+    for _, ch_ch, ch_fr, ch_y, ch_x in sortloop(ch, fr, y, x, cuda=cuda):
         channel = channels[ch_ch]
         pixel = channels_pixels_nm[ch_ch]
         width, height = channels_crops_pix[ch_ch]
-        n = len(ch_fr)
-        crop = xp.empty(shape=(n, height, width), dtype=np.float32)
-        x0_pix = xp.empty(shape=n, dtype=np.uint16)
-        y0_pix = xp.empty(shape=n, dtype=np.uint16)
 
-        if cuda :
+        n = len(ch_fr)
+
+        crop = xp.empty((n, height, width), dtype=np.float32)
+        x0_pix = xp.empty(n, dtype=np.uint16)
+        y0_pix = xp.empty(n, dtype=np.uint16)
+
+        if cuda:
             threads_per_block = (8, 8, 8)
             blocks_per_grid = (
                 (n + threads_per_block[0] - 1) // threads_per_block[0],
                 (height + threads_per_block[1] - 1) // threads_per_block[1],
                 (width + threads_per_block[2] - 1) // threads_per_block[2],
             )
-            crop_gpu[blocks_per_grid, threads_per_block](channel, crop, ch_fr, ch_x, ch_y, pixel[1], pixel[0], width, height, x0_pix, y0_pix)
-        else :
-            with nb_threads(parallel) :
-                crop_cpu(channel, crop, ch_fr, ch_x, ch_y, pixel[1], pixel[0], width, height, x0_pix, y0_pix)
+
+            crop_gpu[blocks_per_grid, threads_per_block](
+                channel,
+                crop,
+                ch_fr,
+                ch_x,
+                ch_y,
+                pixel[1],
+                pixel[0],
+                width,
+                height,
+                x0_pix,
+                y0_pix,
+            )
+        else:
+            with nb_threads(parallel):
+                crop_cpu(
+                    channel,
+                    crop,
+                    ch_fr,
+                    ch_x,
+                    ch_y,
+                    pixel[1],
+                    pixel[0],
+                    width,
+                    height,
+                    x0_pix,
+                    y0_pix,
+                )
+
         crops.append(crop)
         X0.append(x0_pix)
         Y0.append(y0_pix)
 
-    return crops, X0, Y0
+    info = {
+        "channels_crops_pix": channels_crops_pix,
+        "channels_pixels_nm": channels_pixels_nm,
+        "argsort": argsort,
+    }
+
+    return crops, X0, Y0, info
 
 
 
 @nb.njit(fastmath=True, cache=True, nogil=True, parallel=True)
-def crop_cpu(channel, crop, F, X, Y, xpixel, ypixel, w, h, x0_pix, y0_pix) :
+def crop_cpu(channel, crop, F, X, Y, xpixel, ypixel, w, h, x0_pix, y0_pix):
+    """CPU implementation of crop extraction."""
     YY, XX = channel[0].shape
-    for i in nb.prange(len(crop)) :
 
-        # bbox
+    for i in nb.prange(len(crop)):
+
         fr, x, y = F[i], X[i], Y[i]
-        if w % 2 : #if odd
-            xpix = int(x / xpixel + 0.5) # rounding
-            x0 = xpix - w//2
-        else : #if even
-            xpix = int(x / xpixel) + 0.5 # rounding
-            x0 = xpix - w//2 + 0.5
-        if h % 2 : #if odd
-            ypix = int(y / ypixel + 0.5) # rounding
-            y0 = ypix - h//2
-        else : #if even
-            ypix = int(y / ypixel) + 0.5 # rounding
-            y0 = ypix - h//2 + 0.5
+
+        # Compute bounding box (handling even/odd sizes)
+        if w % 2:
+            xpix = int(x / xpixel + 0.5)
+            x0 = xpix - w // 2
+        else:
+            xpix = int(x / xpixel) + 0.5
+            x0 = xpix - w // 2 + 0.5
+
+        if h % 2:
+            ypix = int(y / ypixel + 0.5)
+            y0 = ypix - h // 2
+        else:
+            ypix = int(y / ypixel) + 0.5
+            y0 = ypix - h // 2 + 0.5
+
         x0, y0 = int(x0), int(y0)
 
-        # fill
         x0_pix[i] = x0
         y0_pix[i] = y0
+
+        # Fill crop
         for yy in range(y0, y0 + h):
             for xx in range(x0, x0 + w):
                 if 0 <= yy < YY and 0 <= xx < XX:
-                    crop[i, yy-y0, xx-x0] = float(channel[fr, yy, xx])
-                else :
-                    crop[i, yy-y0, xx-x0] = 0.0
+                    crop[i, yy - y0, xx - x0] = float(channel[fr, yy, xx])
+                else:
+                    crop[i, yy - y0, xx - x0] = 0.0
 
 
 
 @nb_cuda.jit(fastmath=True)
-def crop_gpu(channel, crop, F, X, Y, xpixel, ypixel, w, h, x0_pix, y0_pix) :
+def crop_gpu(channel, crop, F, X, Y, xpixel, ypixel, w, h, x0_pix, y0_pix):
+    """GPU implementation of crop extraction."""
     i, dy, dx = nb_cuda.grid(3)
     n = crop.shape[0]
+
     if i < n and dy < h and dx < w:
         YY, XX = channel.shape[1], channel.shape[2]
 
-        # bbox
         fr, x, y = F[i], X[i], Y[i]
-        if w % 2 : #if odd
-            xpix = int(x / xpixel + 0.5) # rounding
-            x0 = xpix - w//2
-        else : #if even
-            xpix = int(x / xpixel) + 0.5 # rounding
-            x0 = xpix - w//2 + 0.5
-        if h % 2 : #if odd
-            ypix = int(y / ypixel + 0.5) # rounding
-            y0 = ypix - h//2
-        else : #if even
-            ypix = int(y / ypixel) + 0.5 # rounding
-            y0 = ypix - h//2 + 0.5
+
+        if w % 2:
+            xpix = int(x / xpixel + 0.5)
+            x0 = xpix - w // 2
+        else:
+            xpix = int(x / xpixel) + 0.5
+            x0 = xpix - w // 2 + 0.5
+
+        if h % 2:
+            ypix = int(y / ypixel + 0.5)
+            y0 = ypix - h // 2
+        else:
+            ypix = int(y / ypixel) + 0.5
+            y0 = ypix - h // 2 + 0.5
+
         x0, y0 = int(x0), int(y0)
 
-        # store origin (only once per crop)
         if dy == 0 and dx == 0:
             x0_pix[i] = x0
             y0_pix[i] = y0
 
-        # global coordinates
         xx = x0 + dx
         yy = y0 + dy
 
-        # bounds check
         if 0 <= yy < YY and 0 <= xx < XX:
             crop[i, dy, dx] = float(channel[fr, yy, xx])
         else:
             crop[i, dy, dx] = 0.0
-

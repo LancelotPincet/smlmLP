@@ -300,13 +300,14 @@ class Config() :
 
 
 def get_datas(data) :
-    """ adds 's' to data paramter caring for units"""
+    """ adds 's' to data parameter caring for units"""
     suffix = ''
     for unit in ['_nm', '_um', '_mm', '_deg', '_rad', '_us', '_ms', '_s', '_pix', '_fr'] :
         if data.endswith(unit) :
             data, suffix = data[:-len(unit)], data[-len(unit):]
             break
-    if not data.endswith('s') and not data.endswith('x') and data[-1].upper() != data[-1] : data = f'{data}s'
+    if data.endswith('us') : data = f'{data[:-2]}i'
+    elif not data.endswith('s') and not data.endswith('x') and data[-1].upper() != data[-1] : data = f'{data}s'
     return data + suffix
 
 

@@ -14,7 +14,7 @@ import numba as nb
 
 # %% Function
 @block()
-def analysis_template(x, y, fr, ch=None, *, cuda=False, parallel=False) :
+def analysis_template(fr, x, y, ch=None, *, cuda=False, parallel=False) :
     '''
     TODO.
     '''
