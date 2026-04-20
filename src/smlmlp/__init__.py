@@ -36,6 +36,7 @@ sources = {
 'crop_remove_bkgd': 'smlmlp.modules.block_LP._functions.crop.crop_remove_bkgd',
 'crop_individual_extract': 'smlmlp.modules.block_LP._functions.crop.crop_individual_extract',
 'load_data': 'smlmlp.modules.block_LP._functions.loading.load_data',
+'load_chunking': 'smlmlp.modules.block_LP._functions.loading.load_chunking',
 'signal_spatial_filter': 'smlmlp.modules.block_LP._functions.signal.signal_spatial_filter',
 'signal_combination': 'smlmlp.modules.block_LP._functions.signal.signal_combination',
 'signal_temporal_filter': 'smlmlp.modules.block_LP._functions.signal.signal_temporal_filter',

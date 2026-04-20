@@ -150,7 +150,7 @@ def signal_combination(
 
         # Copy the filtered signals into reusable buffers.
         if buffers is None:
-            buffers = [signal.copy() for signal in signals]
+            buffers = signals
         else:
             for i in range(len(channels)):
                 buffers[i][:] = signals[i]
@@ -177,7 +177,7 @@ def signal_combination(
 
         # Copy the filtered signals into reusable buffers.
         if buffers is None:
-            buffers = [signal.copy() for signal in signals]
+            buffers = signals
         else:
             for i in range(len(channels)):
                 buffers[i][:] = signals[i]

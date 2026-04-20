@@ -167,6 +167,7 @@ def blink_temporal_on(
             channel,
             sigma=psf_sigma_nm[i] * 3,
             pixel=pix,
+            stacks=True,
             cuda=cuda,
             parallel=parallel,
         )
@@ -200,7 +201,7 @@ def blink_temporal_on(
     info["average"] = y
 
     # Fit the averaged autocorrelation with a 1D exponential model.
-    p0 = [1.0, -0.5]  # tau, offset
+    p0 = [1.0, -0.75]  # tau, offset
     bounds = ([0.0, -1.0], [len(y), 1.0])
 
     expodecay = Exponential1()

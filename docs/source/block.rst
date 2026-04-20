@@ -71,6 +71,7 @@ Loading
 .. toctree::
    :maxdepth: 1
 
+   load_chunking
    load_data
 
 Localization

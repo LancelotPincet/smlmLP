@@ -167,8 +167,31 @@ class Config() :
     # Loads
 
     @metadatum('Loads', dtype=int)
+    def cuda(self) :
+        return 0
+
+    @metadatum('Loads', dtype=int)
+    def parallel(self) :
+        return 0
+
+    @metadatum('Loads', dtype=int)
     def nframes(self) :
         return 60000
+
+    @metadatum('Loads', dtype=int)
+    def loaded(self) :
+        return 256
+
+    @property
+    def pad(self) :
+        median_window_fr = int(self.median_window_ms / self.exposure_ms)
+        temporal_kernel_length = int(self.temporal_kernel_shape[0])
+        pad_max = int((self.loaded - 1) // 2)
+        return min(max(median_window_fr, temporal_kernel_length), pad_max)
+
+    @property
+    def chunk(self) :
+        return self.loaded - self.pad * 2
 
 
 
