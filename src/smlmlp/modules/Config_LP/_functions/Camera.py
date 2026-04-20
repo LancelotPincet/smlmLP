@@ -22,7 +22,7 @@ class Camera :
         ("bits", "Cameras"),
         ("pixel_nm", "Cameras"),
         ("constructor_gain", "Cameras"),
-        ("experimental_gain", "Backgrounds"),
+        ("experimental_gain", "Detections"),
         ("QE", "Cameras"),
         ]
     properties = ['camera_index', 'gain']
