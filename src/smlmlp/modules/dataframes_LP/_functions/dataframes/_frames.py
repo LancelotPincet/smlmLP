@@ -6,7 +6,7 @@
 
 
 # %% Libraries
-from smlmlp import DataFrame, column
+from smlmlp import DataFrame, column, index_frames
 import numpy as np
 
 
@@ -19,7 +19,7 @@ class frames(DataFrame) :
 
     @column(headers=['frame', 'frames'], save=True, index=True, agg='min')
     def fr(self:np.uint32) :
-        return None
+        return index_frames(locs=self.locs)
 
 
 

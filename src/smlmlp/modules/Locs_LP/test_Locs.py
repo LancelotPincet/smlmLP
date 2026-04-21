@@ -35,20 +35,20 @@ def test_function() :
     argunsort = np.arange(10000)
     np.random.shuffle(argunsort)
     array = np.hstack([np.full(100, i) for i in range(100)]) # Stack of constants to apply to xdet and fr (should be paired)
-    xdet = array.astype(np.float32)[argunsort]
+    x_det = array.astype(np.float32)[argunsort]
     fr = array.astype(np.uint32)[argunsort]
 
     # Set data in locs object
     locs.detections.fr = fr
-    locs.detections.xdet = xdet
-    assert (locs.detections.xdet == xdet).all()
+    locs.detections.x_det = x_det
+    assert (locs.detections.x_det == x_det).all()
     assert (locs.detections.fr == fr).all()
 
     # Looking at frames dataframe with merging and spreads
-    xdet_frames = locs.frames.xdet # merging
-    assert (locs.frames.fr == xdet_frames).all()
-    locs.frames.dx = xdet_frames # spreading
-    assert (locs.detections.dx == xdet).all()
+    x_det_frames = locs.frames.x_det # merging
+    assert (locs.frames.fr == x_det_frames).all()
+    locs.frames.dx = x_det_frames # spreading
+    assert (locs.detections.dx == x_det).all()
 
     # Saving and loading
     path = debug_folder / 'locs'
@@ -56,7 +56,7 @@ def test_function() :
     locs2 = Locs(path)
 
     # Filter
-    mask = locs.detections.xdet > 50
+    mask = locs.detections.x_det > 50
     locs3 = locs.filter(mask=mask)
     
 

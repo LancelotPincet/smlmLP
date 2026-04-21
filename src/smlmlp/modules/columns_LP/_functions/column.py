@@ -6,7 +6,7 @@
 
 
 # %% Libraries
-from smlmlp import columns, DataFrame, MainDataFrame, LocsDataFrame
+from smlmlp import columns, DataFrame, MainDataFrame, LocsReceiver
 import numpy as np
 
 
@@ -110,6 +110,15 @@ class column() :
                     dets = df.locs.detections
                     df[self.header] = dets.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
                 return df[self.header].to_numpy()
+            @merged_col.setter
+            def merged_col(df, value) :
+                if value is None :
+                    df.drop(columns=[self.header], inplace=True)
+                    return
+                value = np.asarray(value, dtype=self.dtype)
+                df[self.header] = value
+                dets = df.locs.detections
+                dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
             if hasattr(DataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in DataFrame')
             setattr(DataFrame, self.col, merged_col)
 
@@ -121,10 +130,9 @@ class column() :
                 def index_col(dets) :
                     if self.header in dets.columns :
                         return dets[self.header].to_numpy()
-                    instance = getattr(dets.locs, f'{self.col}s') # instance of dataframe whom index this is
-                    newcol = self.func(instance)
+                    newcol = self.func(dets)
                     if newcol is None : return None
-                    if isinstance(newcol, str) : return getattr(instance, newcol) # Substitute
+                    if isinstance(newcol, str) : newcol = getattr(dets, newcol) # Substitute
                     setattr(dets, self.col, newcol) # Calculated
                     return getattr(dets, self.col) 
                 @index_col.setter
@@ -140,17 +148,19 @@ class column() :
                 @property
                 def get_df(locs) :
                     if self.df_name not in locs.df_dict :
+                        if getattr(locs.detections, self.col, None) is None :
+                            raise KeyError(f'{self.col} is not in detections dataframe, so {self.df_name} dataframe cannot be initialized.')
                         from smlmlp import dataframes
                         locs.df_dict[self.df_name] = dataframes[self.df_name](locs)
                     return locs.df_dict[self.df_name]
-                if hasattr(LocsDataFrame, self.df_name) : raise SyntaxError(f'{self.df_name} cannot be defined twice in LocsDataFrame')
-                setattr(LocsDataFrame, self.df_name, get_df)
+                if hasattr(LocsReceiver, self.df_name) : raise SyntaxError(f'{self.df_name} cannot be defined twice in LocsReceiver')
+                setattr(LocsReceiver, self.df_name, get_df)
                 @property
                 def len_df(locs) :
                     df = getattr(locs, self.df_name)
                     return len(df)
-                if hasattr(LocsDataFrame, f'n{self.df_name}') : raise SyntaxError(f'n{self.df_name} cannot be defined twice in LocsDataFrame')
-                setattr(LocsDataFrame, f'n{self.df_name}', len_df)
+                if hasattr(LocsReceiver, f'n{self.df_name}') : raise SyntaxError(f'n{self.df_name} cannot be defined twice in LocsReceiver')
+                setattr(LocsReceiver, f'n{self.df_name}', len_df)
             else :
                 @property
                 def spread_col(dets) :
@@ -158,9 +168,18 @@ class column() :
                         df = getattr(dets.locs, self.cls.__name__)
                         dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
                     return dets[self.header].to_numpy()
-                if hasattr(MainDataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in LocsDataFrame')
+                @spread_col.setter
+                def spread_col(dets, value) :
+                    if value is None :
+                        dets.drop(columns=[self.header], inplace=True)
+                        return
+                    value = np.asarray(value, dtype=self.dtype)
+                    dets[self.header] = value
+                    df = getattr(dets.locs, self.cls.__name__)
+                    df[self.header] = dets.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
+                if hasattr(MainDataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in LocsReceiver')
                 setattr(MainDataFrame, self.col, spread_col)
-                
+
 
 
     def __get__(self, instance, cls):

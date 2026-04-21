@@ -23,8 +23,8 @@ def open_df(locs, df) :
     if index not in columns.headers :
         warn(f'Skipping opening unknown dataframe with index "{index}"')
         return None
-    col = columns.headers[index]
-    df_name = col.df_name
+    col_index = columns.headers[index]
+    df_name = col_index.df_name
     dataframe =  getattr(locs, df_name)
 
     # Apply column

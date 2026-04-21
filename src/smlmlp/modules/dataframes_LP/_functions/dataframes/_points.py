@@ -19,6 +19,6 @@ class points(DataFrame) :
 
     @column(headers=['point'], save=True, index=True, agg='min')
     def pnt(self:np.uint64) :
-        #if self.locs.detections.ch is None :
-        #    return np.arange(1, ).
+        if self.locs.nchannels == 1 :
+            return "det"
         return None

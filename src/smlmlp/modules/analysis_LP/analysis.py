@@ -21,7 +21,7 @@ from smlmlp import columns
 
 
 # %% Function
-def block(timeit=True) :
+def analysis(timeit=True, df_name='detections') :
     '''
     This function is a decorator to be used on block function, which allow to use config for default values.
     A decorated function can use a config object with config=config_object to defined default value of all the keyword only parameters.
@@ -48,16 +48,17 @@ def block(timeit=True) :
     def decorator(function) :
         name = function.__name__
         @functools.wraps(function)
-        def wrapper(*args, config=None, **kwargs) -> None :
+        def wrapper(*args, locs=None, df_name=df_name, **kwargs) -> None :
 
-            # Manages kwargs from config and locs
+            # Manages kwargs from config and df
             kwargs = {key: value for key, value in kwargs.items() if value is not None}
-            if config is not None :
+            if locs is not None :
+                df = getattr(locs, df_name)
                 signature = inspect.signature(function)
                 kw = {}
                 for pname, param in signature.parameters.items() :
-                    if (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(config, pname) :
-                        kw[pname] = getattr(config, pname)
+                    if (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(df, pname) :
+                        kw[pname] = getattr(df, pname)
                 kw.update(kwargs)
                 kwargs = kw
 
@@ -68,11 +69,11 @@ def block(timeit=True) :
 
             # Check if generator, if normal function just exit here
             if not inspect.isgenerator(result):
-                if timeit :
-                    if name in block.times :
-                        block.times[name] += toc-tic
+                if timeit and locs is not None :
+                    if name in locs.times :
+                        locs.times[name] += toc-tic
                     else :
-                        block.times[name] = toc-tic
+                        locs.times[name] = toc-tic
                 return result
             
             # If is a generator
@@ -82,11 +83,11 @@ def block(timeit=True) :
                         tic = time.perf_counter()
                         value = next(result)
                         toc = time.perf_counter()
-                        if timeit :
-                            if name in block.times :
-                                block.times[name] += toc-tic
+                        if timeit and locs is not None :
+                            if name in locs.times :
+                                locs.times[name] += toc-tic
                             else :
-                                block.times[name] = toc-tic
+                                locs.times[name] = toc-tic
                         yield value
                     except StopIteration:
                         break
@@ -94,7 +95,6 @@ def block(timeit=True) :
 
         return wrapper
     return decorator
-block.times = {}
 
 
 

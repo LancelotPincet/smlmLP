@@ -14,7 +14,7 @@ This class define objects corresponding to localizations sets for one experiment
 
 # %% Libraries
 from corelp import folder, selfkwargs, prop
-from smlmlp import open_df, save_df, LocsDataFrame, DetsDataFrame, Config
+from smlmlp import open_df, save_df, LocsReceiver, DetsDataFrame, Config
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -22,7 +22,7 @@ import numpy as np
 
 
 # %% Class
-class Locs(LocsDataFrame) :
+class Locs(LocsReceiver) :
     '''
     This class define objects corresponding to localizations sets for one experiment.
 
@@ -74,6 +74,8 @@ class Locs(LocsDataFrame) :
             self.config_source = config
         self.config = config if isinstance(config, Config) else Config(config=self.config_source, **self.config_kwargs)
 
+
+
     # Config
     @prop()
     def config_source(self) :
@@ -87,6 +89,8 @@ class Locs(LocsDataFrame) :
     def config_kwargs(self) :
         return dict(ncameras=1) if self.config_source is None else dict()
 
+
+
     # Detections properties
     @property
     def detections(self) :
@@ -96,6 +100,15 @@ class Locs(LocsDataFrame) :
         return len(self.detections)
 
 
+
+    # Analysis
+    @prop(cache=True)
+    def time(self) :
+        return {}
+
+
+
+    # Filter
     def filter(self, *filter_names, mask=None) :
         filters = [getattr(self.detections, name, None) for name in filter_names]
         if mask is not None : filters += [mask]
@@ -108,6 +121,7 @@ class Locs(LocsDataFrame) :
 
 
 
+    # Opening
     def open(self, source) :
         if source is None :
             return
@@ -144,6 +158,7 @@ class Locs(LocsDataFrame) :
 
 
 
+    # Saving
     def save(self, path, file=None) :
         path = Path(path) if file is None else Path(path) / file
         saving_folder = folder(path.with_suffix(''), warning=False)

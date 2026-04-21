@@ -3,15 +3,6 @@ smlmlp.block module
 
 .. autofunction:: smlmlp.block
 
-Analysis
---------
-
-.. toctree::
-   :maxdepth: 1
-
-   analysis_det2blk
-   analysis_template
-
 Background
 ----------
 

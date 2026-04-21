@@ -8,14 +8,13 @@
 # %% Libraries
 from smlmlp import block
 import numpy as np
-import numba as nb
 
 
 
 # %% Function
 @block()
-def analysis_template(fr, x, y, ch=None, *, cuda=False, parallel=False) :
-    '''
-    TODO.
-    '''
+def block_template(channels, /, *, cuda=False, parallel=False):
+    """
+    TODO
+    """
     pass

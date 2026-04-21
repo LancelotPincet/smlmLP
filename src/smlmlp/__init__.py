@@ -15,6 +15,7 @@ A python library for Single Molecule Localization Microscopy.
 sources = {
 'Config': 'smlmlp.modules.Config_LP.Config',
 'Locs': 'smlmlp.modules.Locs_LP.Locs',
+'analysis': 'smlmlp.modules.analysis_LP.analysis',
 'block': 'smlmlp.modules.block_LP.block',
 'columns': 'smlmlp.modules.columns_LP.columns',
 'computer': 'smlmlp.modules.computer_LP.computer',
@@ -24,11 +25,11 @@ sources = {
 'Channel': 'smlmlp.modules.Config_LP._functions.Channel',
 'save_df': 'smlmlp.modules.Locs_LP._functions.save_df',
 'open_df': 'smlmlp.modules.Locs_LP._functions.open_df',
+'analysis_det2blk': 'smlmlp.modules.analysis_LP._functions.analysis.analysis_det2blk',
+'analysis_template': 'smlmlp.modules.analysis_LP._functions.analysis.analysis_template',
 'registrate_pcc_shift': 'smlmlp.modules.block_LP._functions.registration.registrate_pcc_shift',
 'registrate_solve_redundant': 'smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant',
 'registrate_optimize_images': 'smlmlp.modules.block_LP._functions.registration.registrate_optimize_images',
-'analysis_det2blk': 'smlmlp.modules.block_LP._functions.analysis.analysis_det2blk',
-'analysis_template': 'smlmlp.modules.block_LP._functions.analysis.analysis_template',
 'bkgd_spatial_mean': 'smlmlp.modules.block_LP._functions.background.bkgd_spatial_mean',
 'bkgd_spatial_opening': 'smlmlp.modules.block_LP._functions.background.bkgd_spatial_opening',
 'bkgd_combination': 'smlmlp.modules.block_LP._functions.background.bkgd_combination',
@@ -50,9 +51,9 @@ sources = {
 'detect_gain': 'smlmlp.modules.block_LP._functions.detection.detect_gain',
 'detect_snr': 'smlmlp.modules.block_LP._functions.detection.detect_snr',
 'column': 'smlmlp.modules.columns_LP._functions.column',
-'LocsDataFrame': 'smlmlp.modules.dataframes_LP._functions.LocsDataFrame',
 'MainDataFrame': 'smlmlp.modules.dataframes_LP._functions.MainDataFrame',
 'DetsDataFrame': 'smlmlp.modules.dataframes_LP._functions.DetsDataFrame',
+'LocsReceiver': 'smlmlp.modules.dataframes_LP._functions.LocsReceiver',
 'DataFrame': 'smlmlp.modules.dataframes_LP._functions.DataFrame'
 }
 

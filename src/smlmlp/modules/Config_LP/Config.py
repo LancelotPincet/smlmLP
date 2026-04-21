@@ -162,6 +162,9 @@ class Config() :
     def channels(self) :
         return [channel for camera in self.cameras for channel in camera.channels]
 
+    @property
+    def channels_shapes(self) :
+        return [(bb[3]-bb[1], bb[2]-bb[0]) for bboxes in self.cameras_bbox for bb in bboxes]
 
 
     # Loads
@@ -330,6 +333,7 @@ def get_datas(data) :
             data, suffix = data[:-len(unit)], data[-len(unit):]
             break
     if data.endswith('us') : data = f'{data[:-2]}i'
+    elif data.endswith('ex') : data = f'{data[:-2]}ices'
     elif not data.endswith('s') and not data.endswith('x') and data[-1].upper() != data[-1] : data = f'{data}s'
     return data + suffix
 

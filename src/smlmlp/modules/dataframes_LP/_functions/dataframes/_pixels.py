@@ -19,4 +19,4 @@ class pixels(DataFrame) :
 
     @column(headers=['pixel'], save=True, index=True, agg='min')
     def pix(self:np.uint32) :
-        return None
+        return np.round(self.y / self.y_pixel) * self.x_shape + np.round(self.x / self.x_pixel)

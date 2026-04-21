@@ -15,8 +15,8 @@ This is a dict of all the columns that are created.
 class Columns(dict) :
     def __init__(self, *args, **kwargs) :
         super().__init__(*args, **kwargs)
-        self.headers = {}
-        self.head2save = []
+        self.headers = {} # header: column object
+        self.head2save = [] # headers to save
 columns = Columns()
 
 

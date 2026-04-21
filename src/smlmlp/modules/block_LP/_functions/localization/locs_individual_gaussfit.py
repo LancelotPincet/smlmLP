@@ -220,7 +220,7 @@ def locs_individual_gaussfit(
         mux += x0
         muy += y0
         amp = function.amp / qe * gain
-        offset = function.amp / qe * gain
+        offset = function.offset / qe * gain
 
         if cuda:
             mux = xp.asnumpy(mux)

@@ -79,14 +79,14 @@ def locs_individual_splinefit(
     Returns
     -------
     tuple
-        A tuple ``(mux, muy, muz, output)`` where:
+        A tuple ``(mux, muy, muz, info)`` where:
 
         - ``mux`` is the concatenated x localization array in nanometers,
         - ``muy`` is the concatenated y localization array in nanometers,
         - ``muz`` is the concatenated z localization array,
-        - ``output`` is a dictionary with fitted parameter arrays.
+        - ``info`` is a dictionary with fitted parameter arrays.
 
-        ``output`` contains:
+        ``info`` contains:
 
         ``'amp'``
             Concatenated converted amplitudes.
@@ -103,7 +103,7 @@ def locs_individual_splinefit(
     >>> ty = [np.linspace(-1.0, 1.0, 5, dtype=np.float32)]
     >>> tz = [np.linspace(-0.5, 0.5, 5, dtype=np.float32)]
     >>> coeffs = [np.ones((4, 4, 4), dtype=np.float32)]
-    >>> mux, muy, muz, output = locs_individual_splinefit(
+    >>> mux, muy, muz, info = locs_individual_splinefit(
     ...     crops,
     ...     x0,
     ...     y0,
@@ -115,10 +115,10 @@ def locs_individual_splinefit(
     ... )
     >>> mux.shape == muy.shape == muz.shape
     True
-    >>> sorted(output)
+    >>> sorted(info)
     ['amp', 'offset']
 
-    >>> mux, muy, muz, output = locs_individual_splinefit(
+    >>> mux, muy, muz, info = locs_individual_splinefit(
     ...     crops,
     ...     x0,
     ...     y0,
@@ -128,7 +128,7 @@ def locs_individual_splinefit(
     ...     channels_psf_ztangents=tz,
     ...     channels_psf_coeffs=coeffs,
     ... )
-    >>> output['amp'].ndim
+    >>> info['amp'].ndim
     1
     """
     n_channels = len(crops)
@@ -231,7 +231,7 @@ def locs_individual_splinefit(
         mux += x0
         muy += y0
         amp = function.amp / qe * gain
-        offset = function.amp / qe * gain
+        offset = function.offset / qe * gain
 
         if cuda:
             mux = xp.asnumpy(mux)
@@ -246,12 +246,12 @@ def locs_individual_splinefit(
         amp_all.append(amp)
         offset_all.append(offset)
 
-    output = {
+    info = {
         "amp": np.hstack(amp_all),
         "offset": np.hstack(offset_all),
     }
 
-    return np.hstack(mux_all), np.hstack(muy_all), np.hstack(muz_all), output
+    return np.hstack(mux_all), np.hstack(muy_all), np.hstack(muz_all), info
 
 
 
