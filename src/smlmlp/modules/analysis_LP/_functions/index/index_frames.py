@@ -22,7 +22,7 @@ def index_frames(pix, *, cuda=False, parallel=False) :
     '''
     return pix2fr(pix)
 
-@njit(cache=True)
+@nb.njit(cache=True)
 def pix2fr(pix) :
     frame = np.empty_like(pix, dtype=np.uint32)
     frame[0] = 1

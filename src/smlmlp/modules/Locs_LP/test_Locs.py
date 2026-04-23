@@ -34,7 +34,7 @@ def test_function() :
     # Simulate random data
     argunsort = np.arange(10000)
     np.random.shuffle(argunsort)
-    array = np.hstack([np.full(100, i) for i in range(100)]) # Stack of constants to apply to xdet and fr (should be paired)
+    array = np.hstack([np.full(100, i) for i in range(1, 101)]) # Stack of constants to apply to xdet and fr (should be paired)
     x_det = array.astype(np.float32)[argunsort]
     fr = array.astype(np.uint32)[argunsort]
 

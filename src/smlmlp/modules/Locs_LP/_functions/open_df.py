@@ -8,10 +8,11 @@
 # %% Libraries
 from smlmlp import columns
 from warnings import warn
+from contextlib import nullcontext
 
 
 
-def open_df(locs, df) :
+def open_df(locs, df, printer=None) :
 
     # Get dataframe instance
     index = df.index.name
@@ -27,14 +28,18 @@ def open_df(locs, df) :
     df_name = col_index.df_name
     dataframe =  getattr(locs, df_name)
 
-    # Apply column
-    for header in df.columns :
-        if header not in columns.headers :
-            warn(f'Skipping opening unknown column with header "{header}"')
-        col = columns.headers[header]
-        col_name = col.col
-        mine = getattr(dataframe, f'{col_name}_mine')
-        if not mine : continue
-        dtype = col.dtype
-        array = df[header].to_numpy().astype(dtype)
-        setattr(dataframe, col_name, array)
+    timeit = nullcontext() if printer is None else printer.timeit(f"loading {df_name}")
+
+    with timeit :
+        # Apply column
+        for header in df.columns :
+            if printer is not None : printer(f'    {header}') 
+            if header not in columns.headers :
+                warn(f'Skipping opening unknown column with header "{header}"')
+            col = columns.headers[header]
+            col_name = col.col
+            mine = getattr(dataframe, f'{col_name}_mine')
+            if not mine : continue
+            dtype = col.dtype
+            array = df[header].to_numpy().astype(dtype)
+            setattr(dataframe, col_name, array)

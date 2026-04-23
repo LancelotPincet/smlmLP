@@ -18,6 +18,8 @@ from smlmlp import open_df, save_df, LocsReceiver, DetsDataFrame, Config
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from contextlib import nullcontext
+import importlib
 
 
 
@@ -58,8 +60,9 @@ class Locs(LocsReceiver) :
 
     # Initialize with any object
     df_dict = None
-    def __init__(self, source=None, config=None) :
+    def __init__(self, source=None, config=None, **kwargs) :
         self.df_dict = dict(detections=DetsDataFrame(self))
+        selfkwargs(self, kwargs)
 
         #Changes attributes from kwargs values
         if isinstance(source, Locs) :
@@ -72,7 +75,12 @@ class Locs(LocsReceiver) :
         # Config
         if config is not None :
             self.config_source = config
-        self.config = config if isinstance(config, Config) else Config(config=self.config_source, **self.config_kwargs)
+        if isinstance(config, Config) :
+            self.config = config
+        else :
+            timeit = self.printer.timeit('opening config file') if self.printer is not None else nullcontext()
+            with timeit :
+                self.config = Config(config=self.config_source, **self.config_kwargs)
 
 
 
@@ -105,19 +113,7 @@ class Locs(LocsReceiver) :
     @prop(cache=True)
     def time(self) :
         return {}
-
-
-
-    # Filter
-    def filter(self, *filter_names, mask=None) :
-        filters = [getattr(self.detections, name, None) for name in filter_names]
-        if mask is not None : filters += [mask]
-        mask = np.logical_and.reduce(filters)
-        self.detections.keep = mask
-        df_list = [df.loc[getattr(df, 'keep')] for df in self.df_dict.values()]
-        for df in df_list :
-            df.drop(columns=['filter'], inplace=True)
-        return Locs(df_list, config=self.config)
+    printer = None # rootlp printing
 
 
 
@@ -126,7 +122,7 @@ class Locs(LocsReceiver) :
         if source is None :
             return
         elif isinstance(source, pd.DataFrame) :
-            open_df(self, source)
+            open_df(self, source, self.printer)
         elif isinstance(source, dict) :
             selfkwargs(self, source)
         elif isinstance(source, str) or isinstance(source,Path('').__class__) :
@@ -169,11 +165,74 @@ class Locs(LocsReceiver) :
         for df_name, df in self.df_dict.items() :
             if df is None or len(df.columns) == 0 : continue
             path = mainpath.with_stem(f'{stem}_[{df_name}]')
-            save_df(df, path, df.head2save)
+            save_df(df, path, df.head2save, self.printer)
 
         # Saving metadata
         mainpath = saving_folder / f'{stem}_[metadata].json'
         self.config.save(mainpath)
+
+
+
+    # Filter
+    def filter(self, *filter_names, mask=None, df_name="detections") :
+        base_df = self.df_dict[df_name]
+        filters = [getattr(base_df, name, None) for name in filter_names]
+        if mask is not None : filters += [mask]
+        mask = np.logical_and.reduce(filters)
+        base_df.keep = mask
+        df_list = [df.loc[getattr(df, 'keep')] for df in self.df_dict.values()]
+        for df in df_list :
+            df.drop(columns=['filter'], inplace=True)
+        return Locs(df_list, config=self.config)
+
+
+
+    # Split
+    def split(self, nlocs=2) :
+        locs_list = []
+        for i in range(nlocs) :
+            mask = self.blinks.fr % nlocs == i
+            newloc = self.filter(mask=mask, df_name="blinks")
+            locs_list.append(newloc)
+        return tuple(locs_list)
+
+
+
+    # Combine
+    def combine(self, *locs_list, col_name="ch") :
+        locs_list = [self] + list(locs_list)
+        detections = pd.concat([locs.detections for locs in locs_list], ignore_index=True)
+        newlocs = Locs(detections, config=self.config)
+        newcol = np.hstacks([np.full(locs.ndetections, fill_value=i+1, dtype=np.uint8) for i, locs in enumerate(locs_list)])
+        setattr(newlocs.detections, col_name, newcol)
+        return newlocs
+
+
+
+    # Crop
+    def crop(self, xmin, ymin, xmax, ymax) :
+        x, y = self.detections.x, self.detections.y
+        mask = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+        return self.filter(mask=mask)
+
+
+
+# Image
+for img in ["wf", "irradiance"] :
+    @property
+    def img_prop(self) :
+        image = getattr(self.config, f'{img}_image', None)
+        if image is None :
+            module = importlib.import_module("smlmlp")
+            function = getattr(module, f"image_{img}")
+            image = function(locs=self.locs)[0]
+            setattr(self.config, f'{img}_image', image)
+        return image
+    @img_prop.setter
+    def img_prop(self, value) :
+        setattr(self.config, f'{img}_image', value)
+    setattr(Locs, f'{img}_image', img_prop)
+
 
 
 

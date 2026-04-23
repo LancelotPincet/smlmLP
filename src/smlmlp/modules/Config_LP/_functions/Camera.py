@@ -23,6 +23,7 @@ class Camera :
         ("pixel_nm", "Cameras"),
         ("constructor_gain", "Cameras"),
         ("experimental_gain", "Detections"),
+        ("read_noise", "Detections"),
         ("QE", "Cameras"),
         ]
     properties = ['camera_index', 'gain']
@@ -95,6 +96,10 @@ class Camera :
     @prop(dtype=float)
     def experimental_gain(self) : # e-/ADU (Analog to Digital Unit)
         return None
+
+    @prop(dtype=float)
+    def read_noise(self) : # ADU (Analog to Digital Unit)
+        return 0.
 
     @prop(dtype=float)
     def QE(self) : # Quantum Efficiency

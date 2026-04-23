@@ -22,7 +22,7 @@ def index_channels(fr, *, cuda=False, parallel=False) :
     '''
     return fr2ch(fr)
 
-@njit(cache=True)
+@nb.njit(cache=True)
 def fr2ch(fr) :
     channel = np.empty_like(fr, dtype=np.uint8)
     channel[0] = 1

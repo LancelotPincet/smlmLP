@@ -33,6 +33,7 @@ class Channel :
         ("rotation_deg", "Registration"),
         ("x_shear", "Registration"),
         ("y_shear", "Registration"),
+        ("wf_image", "Data"),
         ]
     properties = ["psf_sigma_nm", "psf_radius_nm", "psf_diameter_nm", "psf_fwhm_nm", "spatial_kernel", "spatial_kernel_shape", "psf_kernel", "default_crop_nm", "crop_pix"]
 
@@ -211,6 +212,13 @@ class Channel :
     def y_shear(self) :
         return 0.
 
+
+
+    # Image
+
+    @prop()
+    def wf_image(self) : # 2D image
+        return None
 
 # Adding Camera metadata
 for data, _ in Camera.metadata :

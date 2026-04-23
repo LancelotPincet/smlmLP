@@ -8,6 +8,7 @@
 # %% Libraries
 from smlmlp import columns, DataFrame, MainDataFrame, LocsReceiver
 import numpy as np
+from contextlib import nullcontext
 
 
 
@@ -35,13 +36,13 @@ class column() :
 
 
 
-    def __init__(self, *, headers, save=True, index=False, agg='mean'):
+    def __init__(self, *, headers, save=True, agg='mean', index=False):
         ''' First called, bracket of decorator '''
         self.headers = headers #List of possible headers, first is default one
         self.header = headers[0]
         self.save = save #True to save this column in files
-        self.index = index # True if index is the index of the class
         self.agg = agg # Aggregation method
+        self.index = index # String df_name of base dataframe, False for not an index
 
 
 
@@ -67,11 +68,12 @@ class column() :
     def __set_name__(self, cls, name):
         ''' Called when assigned to a class '''
         self.cls = cls # dataframe object
+        self.df_name = self.cls.__name__
         if self.index :
-            self.df_name = f'{self.header}s'
-            if self.df_name != self.cls.__name__ :
-                raise SyntaxError(f'Index column {self.col} does not coincide with DataFrame name {self.cls.__name__}')
+            if self.df_name != f'{self.header}s' :
+                raise SyntaxError(f'Index column {self.col} does not coincide with DataFrame name {self.df_name}')
             self.cls.index_name = self.header
+            self.cls.parent_name = self.index
 
         # Assign column dict
         if not hasattr(self.cls, "columns_list") : self.cls.columns_dict = {}
@@ -106,19 +108,30 @@ class column() :
         if issubclass(self.cls, MainDataFrame) :
             @property
             def merged_col(df) :
-                if self.header not in df.columns :
-                    dets = df.locs.detections
-                    df[self.header] = dets.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
-                return df[self.header].to_numpy()
+                printer = df.locs.printer
+                timeit = printer.timeit(f"merging {self.header} from detections into {self.df_name}") if printer is not None else nullcontext()
+                with timeit :
+                    if self.header not in df.columns :
+                        parent = getattr(df.locs, df.parent_name)
+                        array = parent.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
+                        if min(getattr(parent, df.index.name)) == 0 : array = array[1:]
+                        df[self.header] = array
+                    return df[self.header].to_numpy()
             @merged_col.setter
             def merged_col(df, value) :
+                printer = df.locs.printer
                 if value is None :
-                    df.drop(columns=[self.header], inplace=True)
-                    return
-                value = np.asarray(value, dtype=self.dtype)
-                df[self.header] = value
-                dets = df.locs.detections
-                dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
+                    timeit = printer.timeit(f"removing {self.header} from {self.df_name}") if printer is not None else nullcontext()
+                    with timeit :
+                        df.drop(columns=[self.header], inplace=True)
+                        return
+                timeit = printer.timeit(f"spreading {self.header} from {self.df_name} into detections") if printer is not None else nullcontext
+                with timeit :
+                    value = np.asarray(value, dtype=self.dtype)
+                    df[self.header] = value
+                    dets = df.locs.detections
+                    if self.header in df.columns : raise ValueError(f'Cannot set {self.col} on {self.df_name} dataframe as it already exists in its normal parent detections dataframe and cannot be spread.')
+                    dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
             if hasattr(DataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in DataFrame')
             setattr(DataFrame, self.col, merged_col)
 
@@ -164,19 +177,31 @@ class column() :
             else :
                 @property
                 def spread_col(dets) :
-                    if self.header not in dets.columns :
-                        df = getattr(dets.locs, self.cls.__name__)
-                        dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
-                    return dets[self.header].to_numpy()
+                    printer = dets.locs.printer
+                    timeit = printer.timeit(f"spreading {self.header} from {self.df_name} into detections") if printer is not None else nullcontext()
+                    with timeit :
+                        if self.header not in dets.columns :
+                            df = getattr(dets.locs, self.df_name)
+                            dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
+                        return dets[self.header].to_numpy()
                 @spread_col.setter
                 def spread_col(dets, value) :
+                    printer = dets.locs.printer
                     if value is None :
-                        dets.drop(columns=[self.header], inplace=True)
-                        return
-                    value = np.asarray(value, dtype=self.dtype)
-                    dets[self.header] = value
-                    df = getattr(dets.locs, self.cls.__name__)
-                    df[self.header] = dets.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
+                        timeit = printer.timeit(f"removing {self.header} from detections") if printer is not None else nullcontext()
+                        with timeit :
+                            dets.drop(columns=[self.header], inplace=True)
+                            return
+                    timeit = printer.timeit(f"merging {self.header} from detections into {self.df_name}") if printer is not None else nullcontext()
+                    with timeit :
+                        value = np.asarray(value, dtype=self.dtype)
+                        dets[self.header] = value
+                        df = getattr(dets.locs, self.df_name)
+                        parent = getattr(df.locs, df.parent_name)
+                        if self.header in df.columns : raise ValueError(f'Cannot set {self.col} on detections dataframe as it already exists in its normal parent {self.df_name} dataframe and cannot be merged.')
+                        array = parent.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
+                        if min(getattr(parent, df.index.name)) == 0 : array = array[1:]
+                        df[self.header] = array
                 if hasattr(MainDataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in LocsReceiver')
                 setattr(MainDataFrame, self.col, spread_col)
 

@@ -16,12 +16,12 @@ This function is a decorator to be used on block function, which allow to use co
 import functools
 import time
 import inspect
-from smlmlp import columns
+from contextlib import nullcontext
 
 
 
 # %% Function
-def analysis(timeit=True, df_name='detections') :
+def analysis(timeit=True, df_name='detections', col_name=None) :
     '''
     This function is a decorator to be used on block function, which allow to use config for default values.
     A decorated function can use a config object with config=config_object to defined default value of all the keyword only parameters.
@@ -48,12 +48,13 @@ def analysis(timeit=True, df_name='detections') :
     def decorator(function) :
         name = function.__name__
         @functools.wraps(function)
-        def wrapper(*args, locs=None, df_name=df_name, **kwargs) -> None :
+        def wrapper(*args, locs=None, df_name=df_name, col_name=col_name, **kwargs) -> None :
 
             # Manages kwargs from config and df
             kwargs = {key: value for key, value in kwargs.items() if value is not None}
             if locs is not None :
                 df = getattr(locs, df_name)
+                df.col_name = col_name
                 signature = inspect.signature(function)
                 kw = {}
                 for pname, param in signature.parameters.items() :
@@ -61,11 +62,17 @@ def analysis(timeit=True, df_name='detections') :
                         kw[pname] = getattr(df, pname)
                 kw.update(kwargs)
                 kwargs = kw
+                df.col_name = None
+                printer = locs.printer
+                timeit = printer.timeit(f"applying {name} analysis") if printer is not None else nullcontext()
+            else :
+                timeit = nullcontext()
 
             #Launch timed function
-            tic = time.perf_counter()
-            result = function(*args, **kwargs)
-            toc = time.perf_counter()
+            with timeit :
+                tic = time.perf_counter()
+                result = function(*args, **kwargs)
+                toc = time.perf_counter()
 
             # Check if generator, if normal function just exit here
             if not inspect.isgenerator(result):

@@ -17,6 +17,10 @@ class dyes(DataFrame) :
     Dyes dataframe
     '''
 
-    @column(headers=['dye'], save=True, index=True, agg='min')
+    @column(headers=['dye'], save=True, agg='min', index="blinks")
     def dye(self:np.uint8) :
-        return None
+        if self.locs.config.ndyes == 1 :
+            return np.ones(self.locs.ndetections, dtype=np.uint8)
+        else :
+            from smlmlp import index_dyes
+            return index_dyes(locs=self.locs)[0]

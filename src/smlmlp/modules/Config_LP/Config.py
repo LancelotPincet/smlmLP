@@ -68,7 +68,7 @@ class Config() :
                         data = {}
                         for file in config_folder.glob('*.npy') :
                             key = file.stem
-                            data[key] = np.load(file)
+                            data[key] = np.load(file, allow_pickle=True)
                         config["Data"] = data
                 else :
                     raise SyntaxError(f'config path was not recognized: {config}')
@@ -115,7 +115,7 @@ class Config() :
             json.dump(metadata, json_file, indent=4)
         config_folder = folder(path.parent / "_config_data", warning=False)
         for key, value in data.items() :
-            np.save(config_folder / f"{key}.npy", np.asarray(value))
+            np.save(config_folder / f"{key}.npy", np.array(value, dtype=object))
 
 
 
@@ -322,6 +322,165 @@ class Config() :
         h = max([cz[0] for cz in self.channels_default_crops_nm])
         w = max([cz[1] for cz in self.channels_default_crops_nm])
         return max(h, w)
+
+
+
+    # Localization
+
+    @metadatum('Localizations')
+    def optimizer(self) : # string
+        return "lm"
+    @optimizer.setter
+    def optimizer(self, value) :
+        assert type(value) is str
+        assert value.lower() in ['lm']
+        self._optimizer = value.lower()
+
+    @metadatum('Localizations')
+    def estimator(self) : # string
+        return "mle"
+    @estimator.setter
+    def estimator(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["mle", "lse"]
+        self._estimator = value.lower()
+
+    @metadatum('Localizations')
+    def distribution(self) : # string
+        return "poisson"
+    @distribution.setter
+    def distribution(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["poisson", "normal"]
+        self._distribution = value.lower()
+
+    @metadatum('Localizations')
+    def model(self) : # string
+        return "isogaussian"
+    @model.setter
+    def model(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["isogaussian", "gaussian", "spline"]
+        self._model = value.lower()
+
+
+
+    # Points
+
+    @metadatum('Methods')
+    def x_method(self) : # string
+        return "fit"
+    @x_method.setter
+    def x_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["det", "fit", "modloc", "timeloc"]
+        self._x_method = value.lower()
+
+    @metadatum('Methods')
+    def y_method(self) : # string
+        return "fit"
+    @y_method.setter
+    def y_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["det", "fit", "modloc", "timeloc"]
+        self._y_method = value.lower()
+
+    @metadatum('Methods')
+    def z_method(self) : # string
+        return "fit"
+    @z_method.setter
+    def z_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["fit", "astig", "biplane", "donald", "modloc", "timeloc", "miet", "qtirf"]
+        self._z_method = value.lower()
+
+    @metadatum('Methods')
+    def azimuth_method(self) : # string
+        return "polar3d"
+    @azimuth_method.setter
+    def azimuth_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["polar2d", "polar3d"]
+        self._azimuth_method = value.lower()
+
+    @metadatum('Methods')
+    def tilt_method(self) : # string
+        return "polar3d"
+    @tilt_method.setter
+    def tilt_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["polar3d"]
+        self._tilt_method = value.lower()
+
+    @metadatum('Methods')
+    def phase_method(self) : # string
+        return "demodulated"
+    @phase_method.setter
+    def phase_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["demodulated", "sequential"]
+        self._phase_method = value.lower()
+
+    @metadatum('Methods')
+    def lifetime_method(self) : # string
+        return "iflim"
+    @lifetime_method.setter
+    def lifetime_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["tcspc", "iflim", "dpflim"]
+        self._lifetime_method = value.lower()
+
+    @metadatum('Methods')
+    def frequency_method(self) : # string
+        return "spadarray"
+    @frequency_method.setter
+    def frequency_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["singlespad", "spadarray"]
+        self._frequency_method = value.lower()
+
+    @metadatum('Methods')
+    def drift_method(self) : # string
+        return "none"
+    @drift_method.setter
+    def drift_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["none", "crosscorr", "comet", "aim", "meanshift"]
+        self._drift_method = value.lower()
+
+    @metadatum('Methods')
+    def demix_method(self) : # string
+        return "spectral"
+    @demix_method.setter
+    def demix_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["flux", "spectral", "lifetime"]
+        self._demix_method = value.lower()
+
+
+
+    # Labelling
+    
+    @metadatum('Labelling')
+    def dyes(self) : # string list
+        return ['unknown']
+    @dyes.setter
+    def dyes(self, value) :
+        for v in value :
+            assert type(v) is str
+        value = [v.lower() for v in value]
+        self._dyes = value
+    @property
+    def ndyes(self) :
+        return len(self.ndyes)
+
+
+
+    # Image
+
+    @metadatum('Data')
+    def irradiance_image(self) : # 2D image
+        return None
 
 
 
