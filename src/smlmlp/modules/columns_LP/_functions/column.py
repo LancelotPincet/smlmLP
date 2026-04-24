@@ -4,249 +4,423 @@
 # GitHub        : https://github.com/LancelotPincet
 
 
-
 # %% Libraries
-from smlmlp import columns, DataFrame, MainDataFrame, LocsReceiver
-import numpy as np
 from contextlib import nullcontext
 
+import numpy as np
+
+from smlmlp import columns, DataFrame, MainDataFrame, LocsReceiver
 
 
 # %% Class
-class column() :
-    '''
-    This object is a decorator to apply to localization columns.
-    
+class column:
+    """
+    Decorator/descriptor used to declare dataframe columns.
+
     Parameters
     ----------
-    a : int or float
-        TODO.
+    headers : list[str]
+        Possible file headers for this column. The first one is the canonical header.
+    save : bool, default=True
+        Whether this column should be saved.
+    agg : str or callable, default='mean'
+        Aggregation method used when merging from a parent dataframe.
+    index : str or bool, default=False
+        Parent dataframe name for index columns. False means this is not an index column.
+    """
 
-    Attributes
-    ----------
-    _attr : int or float
-        TODO.
-
-    Examples
-    --------
-    >>> from smlmlp import column
-    ...
-    >>> instance = column(TODO)
-    '''
-
-
-
-    def __init__(self, *, headers, save=True, agg='mean', index=False):
-        ''' First called, bracket of decorator '''
-        self.headers = headers #List of possible headers, first is default one
+    def __init__(self, *, headers, dtype, save=True, agg="mean", index=False):
+        self.headers = headers
         self.header = headers[0]
-        self.save = save #True to save this column in files
-        self.agg = agg # Aggregation method
-        self.index = index # String df_name of base dataframe, False for not an index
+        self.save = save
+        self.agg = agg
+        self.index = index
+        self.dtype = dtype
 
+    def __call__(self, func):
+        """Decorator entry point."""
+        self.func = func
+        self.col = func.__name__
 
-
-    def __call__(self, func) :
-        ''' Called after initialization '''
-
-        #Get column info
-        self.func = func #Default behavior function
-        self.col = func.__name__ #column shortcut name
-        self.dtype = func.__annotations__['self'] # dtype of column
-
-        #Updating columns dictionnaries
-        if self.col in columns: raise SyntaxError(f"Column {self.col} is defined twice")
+        if self.col in columns:
+            raise SyntaxError(f"Column {self.col} is defined twice")
         columns[self.col] = self
-        for header in self.headers :
-            if header in columns.headers: raise SyntaxError(f"Header {header} is defined twice")
+
+        for header in self.headers:
+            if header in columns.headers:
+                raise SyntaxError(f"Header {header} is defined twice")
             columns.headers[header] = self
 
         return self
 
-
-
     def __set_name__(self, cls, name):
-        ''' Called when assigned to a class '''
-        self.cls = cls # dataframe object
-        self.df_name = self.cls.__name__
-        if self.index :
-            if self.df_name != f'{self.header}s' :
-                raise SyntaxError(f'Index column {self.col} does not coincide with DataFrame name {self.df_name}')
-            self.cls.index_name = self.header
-            self.cls.parent_name = self.index
+        """Called when the descriptor is assigned to a class."""
+        self.cls = cls
+        self.df_name = cls.__name__
 
-        # Assign column dict
-        if not hasattr(self.cls, "columns_list") : self.cls.columns_dict = {}
-        self.cls.columns_dict[self.col] = self
+        if self.index:
+            if self.df_name != f"{self.header}s":
+                raise SyntaxError(
+                    f"Index column {self.col} does not coincide with DataFrame name {self.df_name}"
+                )
+            cls.index_header = self.header
+            cls.index_col = self.col
+            cls.parent_name = self.index
+            cls.df_name = self.df_name
 
-        # Assign saving list
-        if self.index :
-            for header in self.headers :
-                MainDataFrame.head2save.append(header)
-        else :
-            if not hasattr(self.cls, "head2save") : self.cls.head2save = []
-            for header in self.headers :
-                self.cls.head2save.append(header)
-        
+        # Register in owning class
+        if not hasattr(cls, "columns_dict"):
+            cls.columns_dict = {}
+        cls.columns_dict[self.col] = self
 
-        # Get column object from dataframe instance
+        # Saving headers
+        if self.index:
+            if not hasattr(MainDataFrame, "head2save"):
+                MainDataFrame.head2save = []
+            for header in self.headers:
+                if header not in MainDataFrame.head2save:
+                    MainDataFrame.head2save.append(header)
+        else:
+            if not hasattr(cls, "head2save"):
+                cls.head2save = []
+            for header in self.headers:
+                if header not in cls.head2save:
+                    cls.head2save.append(header)
+
+        # Access to the column object through _<col>
         @property
-        def _col(instance) :
+        def _col(instance):
             return self
-        setattr(self.cls, f'_{self.col}', _col)
 
-        # Belongs
-        if self.index or issubclass(self.cls, MainDataFrame) :
-            setattr(MainDataFrame, f'{self.col}_mine', True)
-            setattr(DataFrame, f'{self.col}_mine', False)
-        else :
-            setattr(MainDataFrame, f'{self.col}_mine', False)
-            setattr(DataFrame, f'{self.col}_mine', True)
-            
+        setattr(cls, f"_{self.col}", _col)
 
-        # Set on MainDataFrame
-        if issubclass(self.cls, MainDataFrame) :
-            @property
-            def merged_col(df) :
-                printer = df.locs.printer
-                timeit = printer.timeit(f"merging {self.header} from detections into {self.df_name}") if printer is not None else nullcontext()
-                with timeit :
-                    if self.header not in df.columns :
-                        parent = getattr(df.locs, df.parent_name)
-                        array = parent.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
-                        if min(getattr(parent, df.index.name)) == 0 : array = array[1:]
-                        df[self.header] = array
-                    return df[self.header].to_numpy()
-            @merged_col.setter
-            def merged_col(df, value) :
-                printer = df.locs.printer
-                if value is None :
-                    timeit = printer.timeit(f"removing {self.header} from {self.df_name}") if printer is not None else nullcontext()
-                    with timeit :
-                        df.drop(columns=[self.header], inplace=True)
-                        return
-                timeit = printer.timeit(f"spreading {self.header} from {self.df_name} into detections") if printer is not None else nullcontext
-                with timeit :
-                    value = np.asarray(value, dtype=self.dtype)
-                    df[self.header] = value
-                    dets = df.locs.detections
-                    if self.header in df.columns : raise ValueError(f'Cannot set {self.col} on {self.df_name} dataframe as it already exists in its normal parent detections dataframe and cannot be spread.')
-                    dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
-            if hasattr(DataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in DataFrame')
-            setattr(DataFrame, self.col, merged_col)
+        # Ownership flags
+        if self.index or issubclass(cls, MainDataFrame):
+            setattr(MainDataFrame, f"{self.col}_mine", True)
+            setattr(DataFrame, f"{self.col}_mine", False)
+        else:
+            setattr(MainDataFrame, f"{self.col}_mine", False)
+            setattr(DataFrame, f"{self.col}_mine", True)
 
-        
-        # Set on DataFrame
-        else :
-            if self.index :
-                @property
-                def index_col(dets) :
-                    if self.header in dets.columns :
-                        return dets[self.header].to_numpy()
-                    newcol = self.func(dets)
-                    if newcol is None : return None
-                    if isinstance(newcol, str) : newcol = getattr(dets, newcol) # Substitute
-                    setattr(dets, self.col, newcol) # Calculated
-                    return getattr(dets, self.col) 
-                @index_col.setter
-                def index_col(dets, value) :
-                    if value is None :
-                        dets.drop(columns=[self.header], inplace=True)
-                        dets.df_dict.pop(self.df_name)
-                    else :
-                        array = np.asarray(value, dtype=self.dtype)
-                        dets[self.header] = array
-                if hasattr(MainDataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in MainDataFrame')
-                setattr(MainDataFrame, self.col, index_col)
-                @property
-                def get_df(locs) :
-                    if self.df_name not in locs.df_dict :
-                        if getattr(locs.detections, self.col, None) is None :
-                            raise KeyError(f'{self.col} is not in detections dataframe, so {self.df_name} dataframe cannot be initialized.')
-                        from smlmlp import dataframes
-                        locs.df_dict[self.df_name] = dataframes[self.df_name](locs)
-                    return locs.df_dict[self.df_name]
-                if hasattr(LocsReceiver, self.df_name) : raise SyntaxError(f'{self.df_name} cannot be defined twice in LocsReceiver')
-                setattr(LocsReceiver, self.df_name, get_df)
-                @property
-                def len_df(locs) :
-                    df = getattr(locs, self.df_name)
-                    return len(df)
-                if hasattr(LocsReceiver, f'n{self.df_name}') : raise SyntaxError(f'n{self.df_name} cannot be defined twice in LocsReceiver')
-                setattr(LocsReceiver, f'n{self.df_name}', len_df)
-            else :
-                @property
-                def spread_col(dets) :
-                    printer = dets.locs.printer
-                    timeit = printer.timeit(f"spreading {self.header} from {self.df_name} into detections") if printer is not None else nullcontext()
-                    with timeit :
-                        if self.header not in dets.columns :
-                            df = getattr(dets.locs, self.df_name)
-                            dets[self.header] = dets[df.index.name].map(df[self.header]).to_numpy()
-                        return dets[self.header].to_numpy()
-                @spread_col.setter
-                def spread_col(dets, value) :
-                    printer = dets.locs.printer
-                    if value is None :
-                        timeit = printer.timeit(f"removing {self.header} from detections") if printer is not None else nullcontext()
-                        with timeit :
-                            dets.drop(columns=[self.header], inplace=True)
-                            return
-                    timeit = printer.timeit(f"merging {self.header} from detections into {self.df_name}") if printer is not None else nullcontext()
-                    with timeit :
-                        value = np.asarray(value, dtype=self.dtype)
-                        dets[self.header] = value
-                        df = getattr(dets.locs, self.df_name)
-                        parent = getattr(df.locs, df.parent_name)
-                        if self.header in df.columns : raise ValueError(f'Cannot set {self.col} on detections dataframe as it already exists in its normal parent {self.df_name} dataframe and cannot be merged.')
-                        array = parent.groupby(df.index.name)[self.header].agg(self.agg).to_numpy()
-                        if min(getattr(parent, df.index.name)) == 0 : array = array[1:]
-                        df[self.header] = array
-                if hasattr(MainDataFrame, self.col) : raise SyntaxError(f'{self.col} cannot be defined twice in LocsReceiver')
-                setattr(MainDataFrame, self.col, spread_col)
+        # Install shared merge property on DataFrame for this column name
+        self._install_dataframe_merge_property()
 
+        # Install main-dataframe-facing helpers for non-main dataframe columns
+        if not issubclass(cls, MainDataFrame):
+            if self.index:
+                self._install_index_property_on_main()
+                self._install_locsreceiver_dataframe_access()
+            else:
+                self._install_main_dataframe_spread_property()
 
+    # -------------------------------------------------------------------------
+    # Internal helpers
+    # -------------------------------------------------------------------------
+
+    def _printer_context(self, df, message):
+        printer = getattr(df.locs, "printer", None)
+        return printer.timeit(message) if printer is not None else nullcontext()
+
+    def _coerce_array(self, value):
+        return np.asarray(value, dtype=self.dtype)
+
+    def _drop_column(self, df, header):
+        df.drop(columns=[header], inplace=True, errors="ignore")
+
+    def _ensure_column_materialized(self, df, col_name, header_name=None):
+        """
+        Ensure a logical column exists physically in df.columns.
+
+        Parameters
+        ----------
+        df : dataframe-like
+        col_name : str
+            Descriptor/property name.
+        header_name : str or None
+            Physical header name to check. If None, uses col_name.
+        """
+        if header_name is None:
+            header_name = col_name
+
+        if header_name in df.columns:
+            return
+
+        value = getattr(df, col_name, None)
+        if value is None:
+            raise ValueError(
+                f"{col_name} not in {getattr(df, 'df_name', df.__class__.__name__)} and cannot be materialized"
+            )
+
+        if header_name not in df.columns:
+            setattr(df, col_name, value)
+
+    def _aggregate_parent_to_child(self, parent, child, value_header):
+        """
+        Aggregate parent[value_header] into child rows by child.index_header,
+        aligned explicitly on child.index.
+        """
+        if value_header not in parent.columns:
+            raise ValueError(
+                f"{value_header} not in {child.parent_name} and cannot be merged into {child.df_name}"
+            )
+
+        if child.index_header not in parent.columns:
+            raise ValueError(
+                f"{child.index_header} not in {child.parent_name} and cannot be used to merge {value_header} into {child.df_name}"
+            )
+
+        grouped = parent.groupby(child.index_header)[value_header].agg(self.agg)
+        array = grouped.to_numpy()
+
+        try:
+            index_values = getattr(parent, child.index_col)
+        except Exception:
+            index_values = parent[child.index_header]
+
+        if len(index_values) > 0 and min(index_values) == 0:
+            array = array[1:]
+
+        return array
+
+    def _map_child_to_detections(self, child, value_header):
+        """
+        Spread child[value_header] into detections using detections[child.index_header].
+        """
+        dets = child.locs.detections
+
+        if child.index_header not in dets.columns:
+            self._ensure_column_materialized(dets, child.index_col, child.index_header)
+
+        if value_header not in child.columns:
+            raise ValueError(
+                f"{value_header} not in {child.df_name} and cannot be spread into detections"
+            )
+
+        return dets[child.index_header].map(child[value_header]).to_numpy()
+
+    # -------------------------------------------------------------------------
+    # Installation methods
+    # -------------------------------------------------------------------------
+
+    def _install_dataframe_merge_property(self):
+        """
+        Install a merge property on DataFrame for this column name.
+
+        This allows intermediate dataframes (e.g. points) to lazily aggregate
+        a column from their parent dataframe when possible.
+        """
+        if hasattr(DataFrame, self.col):
+            raise SyntaxError(f"{self.col} cannot be defined twice in DataFrame")
+
+        @property
+        def merged_col(df):
+            with self._printer_context(
+                df, f"merging {self.header} from {df.parent_name} into {df.df_name}"
+            ):
+                if self.header not in df.columns:
+                    parent = getattr(df.locs, df.parent_name)
+
+                    # Ensure parent has the value column physically available
+                    if self.header not in parent.columns:
+                        self._ensure_column_materialized(parent, self.col, self.header)
+
+                    # Ensure parent has the grouping/index map physically available
+                    if df.index_header not in parent.columns:
+                        self._ensure_column_materialized(parent, df.index_col, df.index_header)
+
+                    df[self.header] = self._aggregate_parent_to_child(
+                        parent=parent,
+                        child=df,
+                        value_header=self.header,
+                    )
+
+                return df[self.header].to_numpy()
+
+        @merged_col.setter
+        def merged_col(df, value):
+            with self._printer_context(
+                df, f"spreading {self.header} from {df.df_name} into detections"
+            ):
+                if value is None:
+                    self._drop_column(df, self.header)
+                    return
+
+                dets = df.locs.detections
+                if self.header in dets.columns:
+                    raise ValueError(
+                        f"Cannot set {self.col} on {df.df_name} dataframe as it already exists "
+                        f"in detections and cannot be spread."
+                    )
+
+                df[self.header] = self._coerce_array(value)
+                dets[self.header] = self._map_child_to_detections(df, self.header)
+
+        setattr(DataFrame, self.col, merged_col)
+
+    def _install_index_property_on_main(self):
+        """Install index property on MainDataFrame."""
+        if hasattr(MainDataFrame, self.col):
+            raise SyntaxError(f"{self.col} cannot be defined twice in MainDataFrame")
+
+        @property
+        def index_col(dets):
+            if self.header in dets.columns:
+                return dets[self.header].to_numpy()
+
+            newcol = self.func(dets)
+            if newcol is None:
+                return None
+
+            if isinstance(newcol, str):
+                newcol = getattr(dets, newcol)
+
+            setattr(dets, self.col, newcol)
+            return getattr(dets, self.col)
+
+        @index_col.setter
+        def index_col(dets, value):
+            if value is None:
+                self._drop_column(dets, self.header)
+                if hasattr(dets, "df_dict"):
+                    dets.df_dict.pop(self.df_name, None)
+                return
+
+            dets[self.header] = self._coerce_array(value)
+
+        setattr(MainDataFrame, self.col, index_col)
+
+    def _install_locsreceiver_dataframe_access(self):
+        """Install lazy dataframe access on LocsReceiver."""
+        if hasattr(LocsReceiver, self.df_name):
+            raise SyntaxError(f"{self.df_name} cannot be defined twice in LocsReceiver")
+
+        @property
+        def get_df(locs):
+            if self.df_name not in locs.df_dict:
+                if getattr(locs.detections, self.col, None) is None:
+                    return None
+
+                from smlmlp import dataframes
+
+                locs.df_dict[self.df_name] = dataframes[self.df_name](locs)
+
+            return locs.df_dict[self.df_name]
+
+        setattr(LocsReceiver, self.df_name, get_df)
+
+        len_name = f"n{self.df_name}"
+        if hasattr(LocsReceiver, len_name):
+            raise SyntaxError(f"{len_name} cannot be defined twice in LocsReceiver")
+
+        @property
+        def len_df(locs):
+            df = getattr(locs, self.df_name)
+            return 0 if df is None else len(df)
+
+        setattr(LocsReceiver, len_name, len_df)
+
+    def _install_main_dataframe_spread_property(self):
+        """Install spread property on MainDataFrame."""
+        if hasattr(MainDataFrame, self.col):
+            raise SyntaxError(f"{self.col} cannot be defined twice in MainDataFrame")
+
+        @property
+        def spread_col(dets):
+            with self._printer_context(
+                dets, f"spreading {self.col} from {self.df_name} into detections"
+            ):
+                if self.header not in dets.columns:
+                    df = getattr(dets.locs, self.df_name)
+                    if df is None:
+                        raise ValueError(
+                            f"{self.cls.index_header} not in detections and cannot be used "
+                            f"to spread {self.header} from {self.df_name}"
+                        )
+
+                    if self.header not in df.columns:
+                        self._ensure_column_materialized(df, self.col, self.header)
+
+                    dets[self.header] = self._map_child_to_detections(df, self.header)
+
+                return dets[self.header].to_numpy()
+
+        @spread_col.setter
+        def spread_col(dets, value):
+            with self._printer_context(
+                dets, f"merging {self.header} from detections into {self.df_name}"
+            ):
+                if value is None:
+                    self._drop_column(dets, self.header)
+                    return
+
+                df = getattr(dets.locs, self.df_name)
+                if df is None:
+                    raise ValueError(
+                        f"{self.cls.index_header} not in detections and cannot be used "
+                        f"to merge {self.header} into {self.df_name}"
+                    )
+
+                if self.header in df.columns:
+                    raise ValueError(
+                        f"Cannot set {self.header} on detections dataframe as it already exists "
+                        f"in its normal parent {self.df_name} dataframe and cannot be merged."
+                    )
+
+                dets[self.header] = self._coerce_array(value)
+
+                parent = getattr(df.locs, df.parent_name)
+
+                if self.header not in parent.columns:
+                    self._ensure_column_materialized(parent, self.col, self.header)
+
+                if df.index_header not in parent.columns:
+                    self._ensure_column_materialized(parent, df.index_col, df.index_header)
+
+                df[self.header] = self._aggregate_parent_to_child(
+                    parent=parent,
+                    child=df,
+                    value_header=self.header,
+                )
+
+        setattr(MainDataFrame, self.col, spread_col)
+
+    # -------------------------------------------------------------------------
+    # Descriptor API
+    # -------------------------------------------------------------------------
 
     def __get__(self, instance, cls):
-        # Good practice getter
         if instance is None:
             return self
 
-        # Index
-        if self.index :
+        # Index columns are the dataframe index
+        if self.index:
             return instance.index.to_numpy()
 
-        # Gets from dataframe
-        if self.header in instance.columns :
+        # Already physically present
+        if self.header in instance.columns:
             return instance[self.header].to_numpy()
 
-        # Automatic calculation
+        # Compute lazily
         newcol = self.func(instance)
-        if newcol is None :
+        if newcol is None:
             return None
 
-        # Substitute
-        if isinstance(newcol, str) :
+        # Alias/substitution
+        if isinstance(newcol, str):
             return getattr(instance, newcol)
-        
-        # Calculated
+
+        # Materialize computed values
         setattr(instance, self.col, newcol)
         return getattr(instance, self.col)
 
-
-
     def __set__(self, instance, value):
-        
-        # Index
-        if self.index :
-            if value is None : raise SyntaxError('Setting Dataframe index to None is not possible')
-            return instance.index.to_numpy()
+        if self.index:
+            raise SyntaxError(
+                "Setting Dataframe index is not possible, you need to define the index in locs.detections"
+            )
 
-        #Removing column from dataframe (value=None)
-        if value is None :
-            instance.drop(columns=[self.header], inplace=True)
+        if value is None:
+            self._drop_column(instance, self.header)
+            return
 
-        #Setting column
-        array = np.asarray(value, dtype=self.dtype)
-        instance[self.header] = array
-
+        instance[self.header] = self._coerce_array(value)

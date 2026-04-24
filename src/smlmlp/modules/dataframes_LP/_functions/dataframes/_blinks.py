@@ -17,8 +17,8 @@ class blinks(DataFrame) :
     Blinks dataframe
     '''
 
-    @column(headers=['blink'], save=True, agg='min', index="points")
-    def blk(self:np.uint64) :
+    @column(headers=['blink'], dtype=np.uint64, save=True, agg='min', index="points")
+    def blk(self) :
         from smlmlp import index_blinks
         return index_blinks(locs=self.locs)[0]
 
@@ -26,14 +26,14 @@ class blinks(DataFrame) :
 
     # --- Photophysics ---
 
-    @column(headers=['on time [ms]'], save=True, agg='mean')
-    def on_time(self:np.float32) :
+    @column(headers=['on time [ms]'], dtype=np.float32, save=True, agg='mean')
+    def on_time(self) :
         unique, counts = np.unique(self.locs.points.blk, return_counts=True)
         if unique[0] == 0 : unique, counts = unique[1:], counts[1:]
         return counts * self.locs.config.exposure_ms
 
-    @column(headers=['flux [photons]'], save=True, agg='mean')
-    def flux(self:np.float32) :
+    @column(headers=['flux [photons]'], dtype=np.float32, save=True, agg='mean')
+    def flux(self) :
         from smlmlp import demix_flux
         return demix_flux(locs=self.locs)[0]
 

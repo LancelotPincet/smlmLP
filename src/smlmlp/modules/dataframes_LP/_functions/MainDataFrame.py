@@ -20,7 +20,7 @@ class MainDataFrame(BaseDataFrame) : # This class is here to host dynamic main d
     def __init__(self, locs) :
         super().__init__(locs)
         pd.DataFrame.__init__(self, index=pd.RangeIndex(start=1, stop=1, step=1))
-        self.index.name = self.index_name
+        self.index.name = self.index_header
 
     # Attributes
     head2save = [] # detections dataframe head2save

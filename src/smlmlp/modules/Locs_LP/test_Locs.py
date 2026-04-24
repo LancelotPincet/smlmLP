@@ -56,6 +56,8 @@ def test_function() :
     locs2 = Locs(path)
 
     # Filter
+    from rootlp import printer
+    locs.printer = printer
     mask = locs.detections.x_det > 50
     locs3 = locs.filter(mask=mask)
     

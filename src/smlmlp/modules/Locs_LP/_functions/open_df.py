@@ -26,17 +26,17 @@ def open_df(locs, df, printer=None) :
         return None
     col_index = columns.headers[index]
     df_name = col_index.df_name
-    dataframe =  getattr(locs, df_name)
+    dataframe = getattr(locs, df_name)
 
     timeit = nullcontext() if printer is None else printer.timeit(f"loading {df_name}")
 
     with timeit :
         # Apply column
         for header in df.columns :
-            if printer is not None : printer(f'    {header}') 
             if header not in columns.headers :
                 warn(f'Skipping opening unknown column with header "{header}"')
             col = columns.headers[header]
+            if col is col_index : continue
             col_name = col.col
             mine = getattr(dataframe, f'{col_name}_mine')
             if not mine : continue

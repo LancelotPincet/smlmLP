@@ -23,10 +23,6 @@ def save_df(df, path, head2save=None, printer=None) :
         #Save df
         if head2save is not None :
             columns = [col for col in df.columns if col[1:-1] in head2save]
-        if printer is not None :
-            printer('\ncolumns:')
-            for header in columns :
-                printer(f'    {header}')
         df.to_csv(path, columns=columns, quoting = csv.QUOTE_NONE, float_format="%.3f")
 
         #Substract quotes

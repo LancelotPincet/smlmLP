@@ -17,7 +17,7 @@ class elements(DataFrame) :
     Elements dataframe
     '''
 
-    @column(headers=['element'], save=True, agg='min', index="blinks")
-    def elm(self:np.uint16) :
+    @column(headers=['element'], dtype=np.uint16, save=True, agg='min', index="blinks")
+    def elm(self) :
         from smlmlp import index_elements
         return index_elements(locs=self.locs)[0]

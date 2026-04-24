@@ -14,7 +14,7 @@ This class define objects corresponding to localizations sets for one experiment
 
 # %% Libraries
 from corelp import folder, selfkwargs, prop
-from smlmlp import open_df, save_df, LocsReceiver, DetsDataFrame, Config
+from smlmlp import open_df, save_df, LocsReceiver, DetsDataFrame, Config, columns
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -47,7 +47,7 @@ class Locs(LocsReceiver) :
 
 
     # Creates Locs objects
-    def __new__(cls, source=None, /, **kwargs) :
+    def __new__(cls, source=None, config=None, **kwargs) :
 
         #If Locs object is given as input returns it directly
         if isinstance(source, cls) :
@@ -123,8 +123,6 @@ class Locs(LocsReceiver) :
             return
         elif isinstance(source, pd.DataFrame) :
             open_df(self, source, self.printer)
-        elif isinstance(source, dict) :
-            selfkwargs(self, source)
         elif isinstance(source, str) or isinstance(source,Path('').__class__) :
             path = Path(source)
             if path.is_dir() : # folder : open csv and json
@@ -147,6 +145,26 @@ class Locs(LocsReceiver) :
                 else :
                     raise SyntaxError(f'Locs cannot open file {path}')
         elif isinstance(source, list) or isinstance(source, tuple) :
+            source = list(source)
+            dets_idx = None
+            for idx, df in enumerate(source) :
+                if not isinstance(df, pd.DataFrame) : raise ValueError('Can only open lists/tuples of DataFrames')
+                index = df.index.name
+                if index is not None :
+                    index = index.replace('"', '')
+                    index = index.replace("'", "")
+                else :
+                    index = 'detection'
+                col_index = columns.headers[index]
+                df_name = col_index.df_name
+                if df_name == "detections" :
+                    if dets_idx is not None :
+                        raise ValueError('Multiple detections dataframe to open which is not possible')
+                    dets_idx = idx
+            if dets_idx is None :
+                raise ValueError('No detections dataframe to open which is not possible')
+            dets = source.pop(dets_idx)
+            source = [dets] + source
             for value in source :
                 self.open(value)
         else :
@@ -183,7 +201,7 @@ class Locs(LocsReceiver) :
         df_list = [df.loc[getattr(df, 'keep')] for df in self.df_dict.values()]
         for df in df_list :
             df.drop(columns=['filter'], inplace=True)
-        return Locs(df_list, config=self.config)
+        return Locs(df_list, config=self.config, printer=self.printer)
 
 
 
@@ -202,7 +220,7 @@ class Locs(LocsReceiver) :
     def combine(self, *locs_list, col_name="ch") :
         locs_list = [self] + list(locs_list)
         detections = pd.concat([locs.detections for locs in locs_list], ignore_index=True)
-        newlocs = Locs(detections, config=self.config)
+        newlocs = Locs(detections, config=self.config, printer=self.printer)
         newcol = np.hstacks([np.full(locs.ndetections, fill_value=i+1, dtype=np.uint8) for i, locs in enumerate(locs_list)])
         setattr(newlocs.detections, col_name, newcol)
         return newlocs
