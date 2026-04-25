@@ -28,8 +28,11 @@ from smlmlp.modules.block_LP._functions.loading.load_data import load_data
 from smlmlp.modules.block_LP._functions.registration.registrate_optimize_images import (
     registrate_optimize_images,
 )
-from smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant import (
-    registrate_solve_redundant,
+from smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant_shift import (
+    registrate_solve_redundant_shift,
+)
+from smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant_affine import (
+    registrate_solve_redundant_affine,
 )
 
 
@@ -113,12 +116,57 @@ def test_registrate_solve_redundant_returns_info_last():
     shiftx = np.array([1.0, 2.0, 1.0], dtype=np.float32)
     shifty = np.array([0.0, 1.0, 1.0], dtype=np.float32)
 
-    abs_shiftx, abs_shifty, info = registrate_solve_redundant(shiftx, shifty)
+    abs_shiftx, abs_shifty, info = registrate_solve_redundant_shift(shiftx, shifty)
 
     assert abs_shiftx.shape == (3,)
     assert abs_shifty.shape == (3,)
     assert isinstance(info, dict)
     assert info["pairs"] == [(0, 1), (0, 2), (1, 2)]
+
+
+def test_registrate_solve_redundant_affine_recenters_transforms():
+    """Check affine redundant solving recenters the solved matrices."""
+
+    shiftx = np.array([1.0, 2.0, 1.0], dtype=np.float32)
+    shifty = np.array([0.0, 1.0, 1.0], dtype=np.float32)
+    angle = np.zeros(3, dtype=np.float32)
+    shearx = np.zeros(3, dtype=np.float32)
+    sheary = np.zeros(3, dtype=np.float32)
+    scalex = np.ones(3, dtype=np.float32)
+    scaley = np.ones(3, dtype=np.float32)
+
+    (
+        abs_shiftx,
+        abs_shifty,
+        abs_angle,
+        abs_shearx,
+        abs_sheary,
+        abs_scalex,
+        abs_scaley,
+        info,
+    ) = registrate_solve_redundant_affine(
+        shiftx,
+        shifty,
+        angle,
+        shearx,
+        sheary,
+        scalex,
+        scaley,
+        {"shape": (16, 16), "ref_pix": (1.0, 1.0)},
+    )
+
+    np.testing.assert_allclose(abs_shiftx, [-1.0, 0.0, 1.0], atol=1e-6)
+    np.testing.assert_allclose(abs_shifty, [-1 / 3, -1 / 3, 2 / 3], atol=1e-6)
+    np.testing.assert_allclose(abs_angle, 0.0, atol=1e-6)
+    np.testing.assert_allclose(abs_shearx, 0.0, atol=1e-6)
+    np.testing.assert_allclose(abs_sheary, 0.0, atol=1e-6)
+    np.testing.assert_allclose(abs_scalex, 1.0, atol=1e-6)
+    np.testing.assert_allclose(abs_scaley, 1.0, atol=1e-6)
+    np.testing.assert_allclose(
+        np.mean(info["abs_matrices_second_pass"], axis=0),
+        np.eye(3),
+        atol=1e-6,
+    )
 
 
 def test_load_data_yields_chunk_with_public_bbox_parameter(tmp_path):
@@ -254,11 +302,6 @@ def test_blink_temporal_on_normalizes_scalar_psf_and_default_crop(monkeypatch):
             "smlmlp.modules.block_LP._functions.globlocalization.globloc_fit",
             "globloc_fit",
             ([], [], []),
-        ),
-        (
-            "smlmlp.modules.block_LP._functions.registration.registrate_ecc_affine",
-            "registrate_ecc_shift",
-            ([],),
         ),
     ],
 )
