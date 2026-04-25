@@ -123,9 +123,10 @@ def registrate_pcc_shift(
     info = {
         "ref_pix": ref_pix,
         "pairs": pairs,
+        "CC": CC,
     }
 
-    return CC, shiftx, shifty, info
+    return shiftx, shifty, info
 
 
 

@@ -12,7 +12,7 @@ import bottleneck as bn
 
 
 @block()
-def registrate_solve_redundant(
+def registrate_solve_redundant_shift(
     shiftx,
     shifty,
     /,

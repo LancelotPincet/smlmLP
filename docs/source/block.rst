@@ -94,7 +94,8 @@ Registration
    registrate_ecc_affine
    registrate_optimize_images
    registrate_pcc_shift
-   registrate_solve_redundant
+   registrate_solve_redundant_affine
+   registrate_solve_redundant_shift
 
 Signal
 ------

@@ -8,7 +8,7 @@ from smlmlp import block
 
 
 @block()
-def registrate_ecc_shift(
+def registrate_ecc_affine(
     optimized,
     /,
     ref_pix=1.0,
@@ -39,4 +39,4 @@ def registrate_ecc_shift(
     SyntaxError
         Always raised because this block is not implemented.
     """
-    raise SyntaxError("Not implemented yet.")
+    return shiftx, shifty, angle, shearx, sheary, info
