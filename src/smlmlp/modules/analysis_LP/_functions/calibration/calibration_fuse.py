@@ -13,8 +13,8 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="points")
-def metric_expohisto(col, /, *, cuda=False, parallel=False) :
+@analysis(df_name="blinks")
+def calibration_fuse(xx, yy, elm, *, cuda=False, parallel=False) :
     '''
     TODO.
     '''

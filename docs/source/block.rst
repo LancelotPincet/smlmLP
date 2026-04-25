@@ -91,7 +91,7 @@ Registration
 .. toctree::
    :maxdepth: 1
 
-   registrate_
+   registrate_ecc_affine
    registrate_optimize_images
    registrate_pcc_shift
    registrate_solve_redundant

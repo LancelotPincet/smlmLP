@@ -301,3 +301,13 @@ class detections(MainDataFrame) :
             setattr(cls, f'zernike_{i:02}', zernike)
 
 
+
+    # --- Simulations ---
+
+    @column(headers=['x groundtruth [nm]'], dtype=np.float32, save=True, agg='mean')
+    def x_groundtruth(self) :
+        return None
+
+    @column(headers=['y groundtruth [nm]'], dtype=np.float32, save=True, agg='mean')
+    def y_groundtruth(self) :
+        return None
