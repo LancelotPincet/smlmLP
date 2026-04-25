@@ -653,11 +653,19 @@ class Config() :
 
 
 
+    # Rendering
+    
+    @metadatum('Rendering')
+    def pixel_sr_nm(self) :
+        return 15.
+
+
+
     # Time
     
     @metadatum('Time')
     def frames_per_sequence(self) :
-        return 1000
+        return 100
 
     @metadatum('Time')
     def zstack_speed(self) : # nm / frame
@@ -668,20 +676,88 @@ class Config() :
     # Drifts
     
     @metadatum('Drift')
-    def aim_(self) :
+    def crosscorr_frames_per_segment(self) :
+        return 1000.
+
+    @metadatum('Drift')
+    def crosscorr_outlier_fraction(self) :
+        return 0.1
+
+    @metadatum('Drift')
+    def crosscorr_recompute(self) :
+        return True
+
+    @metadatum('Drift')
+    def meanshift_frames_per_segment(self) :
         return 10.
 
     @metadatum('Drift')
-    def comet_(self) :
+    def meanshift_outlier_fraction(self) :
+        return 0.1
+
+    @metadatum('Drift')
+    def meanshift_recompute(self) :
+        return True
+
+    @metadatum('Drift')
+    def meanshift_max_iter(self) :
+        return 100
+
+    @metadatum('Drift')
+    def meanshift_tol_nm(self) :
+        return 1.
+
+    @metadatum('Drift')
+    def meanshift_max_drift_nm(self) :
+        return 300.
+
+    @metadatum('Drift')
+    def aim_frames_per_segment(self) :
         return 10.
 
     @metadatum('Drift')
-    def crosscorr_(self) :
+    def aim_outlier_fraction(self) :
+        return 0.1
+
+    @metadatum('Drift')
+    def aim_recompute(self) :
+        return True
+
+    @metadatum('Drift')
+    def aim_kde_bandwidth_nm(self) :
+        return 40.
+
+    @metadatum('Drift')
+    def aim_learning_rate(self) :
+        return 0.5
+
+    @metadatum('Drift')
+    def aim_max_iter(self) :
+        return 200
+
+    @metadatum('Drift')
+    def aim_tol(self) :
+        return 1e-3
+
+    @metadatum('Drift')
+    def aim_lambda_smooth(self) :
+        return 0.5
+
+    @metadatum('Drift')
+    def comet_frames_per_segment(self) :
         return 10.
 
     @metadatum('Drift')
-    def meanshift_(self) :
-        return 10.
+    def comet_recompute(self) :
+        return True
+
+    @metadatum('Drift')
+    def comet_max_drift_nm(self) :
+        return 300.
+
+    @metadatum('Drift')
+    def comet_tol(self) :
+        return 1e-4
 
 
 

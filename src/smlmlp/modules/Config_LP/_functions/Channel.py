@@ -83,6 +83,9 @@ class Channel :
     @prop()
     def psf_theta_deg(self) : # [°]
         return 0.
+    @prop()
+    def channels_fit_theta(self) : # [°]
+        return 0.
 
     @property
     def psf_sigma_nm(self) : # [nm]

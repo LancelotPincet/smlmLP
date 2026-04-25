@@ -228,6 +228,14 @@ def registrate_solve_redundant(
     residy_2 = shifty - predy_2
     resid_2 = np.sqrt(residx_2 ** 2 + residy_2 ** 2)
 
+    # Recenter origin
+
+    ox = np.mean(abs_shiftx_2)
+    oy = np.mean(abs_shifty_2)
+
+    abs_shiftx_2 = abs_shiftx_2 - ox
+    abs_shifty_2 = abs_shifty_2 - oy
+
     info = {
         "pairs": pairs,
         "mask_keep_first_pass": mask_keep_1,
@@ -242,6 +250,7 @@ def registrate_solve_redundant(
         "resid_second_pass": resid_2,
         "median_resid_first_pass": med_r,
         "robust_sigma_first_pass": sigma_r,
+        "origin_shift": (oy, ox),
     }
 
     return abs_shiftx_2, abs_shifty_2, info

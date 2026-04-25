@@ -34,7 +34,7 @@ def locs_individual_gaussfit(
     channels_psf_xsigmas_nm=SIGMA,
     channels_psf_ysigmas_nm=SIGMA,
     channels_psf_theta_deg=0.0,
-    fit_theta=False,
+    channels_fit_theta=0.0,
 ):
     """
     Fit each crop independently with an anisotropic 2D Gaussian model.
@@ -73,7 +73,7 @@ def locs_individual_gaussfit(
         Initial/fixed PSF sigma along y for each channel.
     channels_psf_theta_deg : float or sequence, optional
         Initial/fixed PSF angle in degrees for each channel.
-    fit_theta : bool, optional
+    channels_fit_theta : bool, optional
         Whether to fit the PSF rotation angle.
 
     Returns
@@ -123,7 +123,7 @@ def locs_individual_gaussfit(
     ...     channels_psf_xsigmas_nm=[80.0],
     ...     channels_psf_ysigmas_nm=[95.0],
     ...     channels_psf_theta_deg=[5.0],
-    ...     fit_theta=True,
+    ...     channels_fit_theta=True,
     ... )
     >>> output['sigmax'].ndim
     1
@@ -153,6 +153,10 @@ def locs_individual_gaussfit(
         channels_psf_theta_deg,
         n_channels,
     )
+    channels_fit_theta = _normalize_psf_parameter(
+        channels_fit_theta,
+        n_channels,
+    )
 
     fit_kwargs = [
         dict(
@@ -168,6 +172,7 @@ def locs_individual_gaussfit(
             channels_psf_xsigmas_nm,
             channels_psf_ysigmas_nm,
             channels_psf_theta_deg,
+            channels_fit_theta,
         )
     ]
 

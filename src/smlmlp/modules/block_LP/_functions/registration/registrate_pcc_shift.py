@@ -32,7 +32,7 @@ def registrate_pcc_shift(
     Parameters
     ----------
     optimized : sequence of ndarray
-        Sequence of optimized image stacks, one per channel.
+        Sequence of optimized image, one per channel.
     ref_pix : float or tuple of float, optional
         Reference pixel size used to convert shifts to physical units. If a
         scalar is provided, it is applied to both y and x as ``(ref_pix,
@@ -70,15 +70,15 @@ def registrate_pcc_shift(
     Examples
     --------
     >>> import numpy as np
-    >>> ch1 = np.random.rand(4, 16, 16).astype(np.float32)
-    >>> ch2 = np.random.rand(4, 16, 16).astype(np.float32)
+    >>> ch1 = np.random.rand(16, 16).astype(np.float32)
+    >>> ch2 = np.random.rand(16, 16).astype(np.float32)
     >>> CC, shiftx, shifty, info = registrate_pcc_shift([ch1, ch2])
     >>> len(CC)
     1
     >>> info["pairs"]
     [(0, 1)]
 
-    >>> ch3 = np.random.rand(4, 16, 16).astype(np.float32)
+    >>> ch3 = np.random.rand(16, 16).astype(np.float32)
     >>> CC, shiftx, shifty, info = registrate_pcc_shift(
     ...     [ch1, ch2, ch3],
     ...     ref_pix=(100.0, 120.0),
@@ -111,7 +111,6 @@ def registrate_pcc_shift(
                 phase=True,
                 cuda=cuda,
                 parallel=parallel,
-                stack=True,
             )
             if cuda:
                 cc = xp.asnumpy(cc)
@@ -132,33 +131,24 @@ def registrate_pcc_shift(
 
 
 
-def subpixel_peak_stack(cc, ref_pix=(1.0, 1.0)):
+def subpixel_peak_stack(c, ref_pix=(1.0, 1.0)):
     """Estimate one subpixel peak position per frame from a CC stack."""
-    nframes = cc.shape[0]
-    shiftx = np.empty(nframes, dtype=float)
-    shifty = np.empty(nframes, dtype=float)
 
-    ny, nx = cc.shape[-2:]
+    ny, nx = c.shape
 
-    for k in range(nframes):
-        c = cc[k]
+    iy, ix = np.unravel_index(int(np.argmax(c)), c.shape)
 
-        iy, ix = np.unravel_index(int(np.argmax(c)), c.shape)
+    # Skip subpixel refinement when the peak touches the border.
+    if not (0 < iy < ny - 1 and 0 < ix < nx - 1):
+        dy_sub, dx_sub = 0.0, 0.0
+    else:
+        win = c[iy - 1:iy + 2, ix - 1:ix + 2].astype(float)
+        dy_sub, dx_sub = subpixel_peak_2d(win)
 
-        # Skip subpixel refinement when the peak touches the border.
-        if not (0 < iy < ny - 1 and 0 < ix < nx - 1):
-            dy_sub, dx_sub = 0.0, 0.0
-        else:
-            win = c[iy - 1:iy + 2, ix - 1:ix + 2].astype(float)
-            dy_sub, dx_sub = subpixel_peak_2d(win)
+    dy = ((iy - ny // 2) + dy_sub) * ref_pix[0]
+    dx = ((ix - nx // 2) + dx_sub) * ref_pix[1]
 
-        dy = ((iy - ny // 2) + dy_sub) * ref_pix[0]
-        dx = ((ix - nx // 2) + dx_sub) * ref_pix[1]
-
-        shiftx[k] = dx
-        shifty[k] = dy
-
-    return shiftx, shifty
+    return dx, dy
 
 
 

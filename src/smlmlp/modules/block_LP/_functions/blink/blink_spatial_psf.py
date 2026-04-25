@@ -16,7 +16,7 @@ from scipy.optimize import curve_fit
 
 
 # %% Function
-@block()
+@block(timeit=False)
 def blink_spatial_psf(
     channels,
     /,

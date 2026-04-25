@@ -20,7 +20,7 @@ _MEMORY_COPY_FACTOR = 5
 
 
 # %% Function
-@block()
+@block(timeit=False)
 def load_chunking(*tif_paths, cuda=False, parallel=False):
     """Estimate a safe frame chunk size from RAM/VRAM availability.
 

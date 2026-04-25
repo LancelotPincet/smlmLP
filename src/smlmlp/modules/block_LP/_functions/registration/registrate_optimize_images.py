@@ -13,7 +13,7 @@ import numpy as np
 
 
 # %% Function
-@block()
+@block(timeit=False)
 def registrate_optimize_images(
     channels,
     /,
@@ -22,7 +22,6 @@ def registrate_optimize_images(
     channels_rotations_deg=None,
     channels_x_shears=None,
     channels_y_shears=None,
-    optimized=None,
     *,
     channels_pixels_nm=1.0,
     cuda=False,
@@ -150,16 +149,16 @@ def registrate_optimize_images(
     new_optimized = []
     for i in range(len(channels)):
         channel = xp.asarray(channels[i])
-        optimize = None if optimized is None else optimized[i]
+        projection = xp.mean(channel, axis=0, dtype=np.float32)
 
         # Build the rescaling and registration transforms, then combine them.
         matrix1 = transform_matrix(
-            channel,
+            projection,
             scalex=scales_x[i],
             scaley=scales_y[i],
         )
         matrix2 = transform_matrix(
-            channel,
+            projection,
             shiftx=channels_x_shifts_nm[i] / ref_pix[1],
             shifty=channels_y_shifts_nm[i] / ref_pix[0],
             angle=channels_rotations_deg[i],
@@ -170,12 +169,10 @@ def registrate_optimize_images(
 
         # Apply the geometric transform and then compress the intensity range.
         optimize = img_transform(
-            channel,
+            projection,
             matrix=matrix,
-            out=optimize,
             cuda=cuda,
             parallel=parallel,
-            stacks=True,
         )
         optimize = compress(
             optimize,
@@ -183,7 +180,6 @@ def registrate_optimize_images(
             white_percent=1,
             black_percent=1,
             saturate=True,
-            stacks=True,
         )
         new_optimized.append(optimize)
 

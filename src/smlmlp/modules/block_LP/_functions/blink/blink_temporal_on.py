@@ -16,7 +16,7 @@ from scipy.optimize import curve_fit
 
 
 # %% Function
-@block()
+@block(timeit=False)
 def blink_temporal_on(
     channels,
     crop_fr=None,

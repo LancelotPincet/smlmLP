@@ -4,7 +4,7 @@ version = "0.1.16"
 description = "A python library for Single Molecule Localization Microscopy."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [ "Bottleneck", "arrlp", "corelp", "funclp", "numpy", "pandas", "stacklp", "tifffile",]
+dependencies = [ "Bottleneck", "arrlp", "corelp", "funclp", "numpy", "opencv-python", "pandas", "stacklp", "tifffile",]
 
 [build-system]
 requires = [ "uv_build",]

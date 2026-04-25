@@ -48,9 +48,18 @@ Globdetection
 .. toctree::
    :maxdepth: 1
 
+   globdet_channel
 
 Globlocalization
 ----------------
+
+.. toctree::
+   :maxdepth: 1
+
+   globloc_fit
+
+Integrate
+---------
 
 .. toctree::
    :maxdepth: 1
@@ -76,19 +85,13 @@ Localization
    locs_individual_isogaussfit
    locs_individual_splinefit
 
-Photon
-------
-
-.. toctree::
-   :maxdepth: 1
-
-
 Registration
 ------------
 
 .. toctree::
    :maxdepth: 1
 
+   registrate_
    registrate_optimize_images
    registrate_pcc_shift
    registrate_solve_redundant

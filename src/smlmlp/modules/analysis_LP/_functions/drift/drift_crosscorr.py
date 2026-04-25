@@ -14,7 +14,7 @@ import numba as nb
 
 # %% Function
 @analysis(df_name="points")
-def drift_crosscorr(x, y, *, cuda=False, parallel=False) :
+def drift_crosscorr(x, y, crosscorr_frames_per_segment=1000, *, crosscorr_outlier_fraction=0.1, crosscorr_recompute=True, pixel_sr_nm=15., cuda=False, parallel=False) :
     '''
     TODO.
     '''
