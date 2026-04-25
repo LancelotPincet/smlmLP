@@ -3,22 +3,25 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from smlmlp import BaseDataFrame
 
 
 
-# %% Function
 class DataFrame(BaseDataFrame) :
-    '''
-    Localization dimensional dataframe
-    '''
+    """
+    Intermediate localization dataframe indexed from detection columns.
+
+    Parameters
+    ----------
+    locs : Locs
+        Parent localization container.
+    """
 
     def __init__(self, locs) :
+        """Initialize the object."""
         super().__init__(locs)
         index = np.sort(self.locs.detections[self.index_header].unique())
         if index[0] == 0 :

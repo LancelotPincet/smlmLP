@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import img_crosscorr, get_xp
 import numpy as np
 
 
 
-# %% Function
 @block()
 def registrate_pcc_shift(
     optimized,

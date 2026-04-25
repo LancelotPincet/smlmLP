@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import img_gaussianfilter, kernel
 import numpy as np
 
 
 
-# %% Function
 @block()
 def bkgd_spatial_mean(
     channels,
@@ -119,7 +117,7 @@ def bkgd_spatial_mean(
     True
     >>> len(noise_corr) == len(channels)
     True
-    >>> "sigmas" in info
+    >>> "spatial_mean_sigmas" in info
     True
 
     Use anisotropic radii shared across channels:
@@ -138,7 +136,7 @@ def bkgd_spatial_mean(
     ...     radii,
     ...     noise_corrections=init_corr,
     ... )
-    >>> len(info["per_channel"]) == 2
+    >>> len(info["spatial_mean_kernels_x"]) == 2
     True
     """
     # Normalize the per-channel spatial mean radii so that downstream code can

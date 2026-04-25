@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from stacklp import temporal_median
 import numpy as np
 
 
 
-# %% Function
 @block()
 def bkgd_temporal_median(
     channels,

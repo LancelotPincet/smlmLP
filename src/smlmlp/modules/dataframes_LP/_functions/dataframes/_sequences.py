@@ -5,21 +5,17 @@
 
 
 
-# %% Libraries
-from smlmlp import DataFrame, column
 import numpy as np
 
+from smlmlp import DataFrame, column
 
 
-# %% Function
 class sequences(DataFrame) :
-    '''
-    Sequences dataframe
-    '''
+    """Sequence-level dataframe aggregated from points."""
 
     @column(headers=['sequence'], dtype=np.uint32, save=True, agg='min', index="points")
     def seq(self) :
+        """Assign sequence identifiers from frame numbers."""
         array = self.fr // self.locs.config.frames_per_sequence
         array[self.fr != 0] += 1
         return array
-

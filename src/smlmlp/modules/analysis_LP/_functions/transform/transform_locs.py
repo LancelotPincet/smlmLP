@@ -4,14 +4,12 @@
 # GitHub        : https://github.com/LancelotPincet
 
 
-# %% Libraries
 from smlmlp import analysis
 import numpy as np
 import numba as nb
 from arrlp import nb_threads
 
 
-# %% Functions
 @analysis(df_name="detections")
 def transform_locs(
     x,
@@ -23,15 +21,25 @@ def transform_locs(
     parallel=False,
 ):
     """
-    Transform localizations from non-aligned coordinates to aligned coordinates.
+    Transform localizations into aligned coordinates.
 
-    locs_transform_matrix are defined in the direction:
-        non-aligned -> aligned
+    Parameters
+    ----------
+    x, y : array-like
+        Localization coordinates in non-aligned coordinates.
+    ch : array-like
+        One-based channel identifiers used to select transform matrices.
+    channels_locs_transform_matrices : array-like
+        Matrices defined from non-aligned to aligned coordinates.
+    cuda, parallel : bool, optional
+        Execution options accepted by all analysis functions.
 
-    Matrix convention:
-        [y_new, x_new, 1] = matrix @ [y, x, 1]
-
-    Coordinates and matrix shifts are both in nm.
+    Returns
+    -------
+    x_t, y_t : ndarray
+        Transformed coordinates.
+    info : dict
+        Empty diagnostics dictionary.
     """
 
     x = np.asarray(x, dtype=np.float32)
@@ -50,7 +58,8 @@ def transform_locs(
             channels_locs_transform_matrices,
         )
 
-    return x_t, y_t, {}
+    info = {}
+    return x_t, y_t, info
 
 @nb.njit(cache=True, parallel=True)
 def _transform_locs(
@@ -59,6 +68,7 @@ def _transform_locs(
     ch,
     matrices,
 ):
+    """Apply per-channel affine transforms."""
     n = len(x)
 
     x_t = np.empty(n, dtype=np.float32)

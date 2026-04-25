@@ -10,45 +10,31 @@
 This module simulates SMLM data.
 """
 
-
-
-# %% Libraries
-
-
-
-
-# %% Function
 def simulation(**kwargs) :
-    '''
+    """
     This module simulates SMLM data.
-    
+
+    Simulate SMLM data.
+
     Parameters
     ----------
-    a : int or float
-        TODO.
+    **kwargs
+        Simulation parameters.
 
     Returns
     -------
-    b : int or float
-        TODO.
+    object
+        Simulated data.
 
     Raises
     ------
-    TypeError
-        TODO.
+    SyntaxError
+        Always raised until the simulator is implemented.
+    """
 
-    Examples
-    --------
-    >>> from smlmlp import simulation
-    ...
-    >>> simulation() # TODO
-    '''
+    raise SyntaxError("Not implemented yet.")
 
-    return TODO
-
-
-
-# %% Test function run
 if __name__ == "__main__":
     from corelp import test
+
     test(__file__)

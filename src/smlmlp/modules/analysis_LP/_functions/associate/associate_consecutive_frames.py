@@ -5,19 +5,18 @@
 
 
 
-# %% Libraries
-from smlmlp import analysis
-import numpy as np
-from scipy.spatial import cKDTree
-from scipy.optimize import linear_sum_assignment
-from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph import connected_components
-from joblib import Parallel, delayed
 import os
 
+from joblib import Parallel, delayed
+import numpy as np
+from scipy.optimize import linear_sum_assignment
+from scipy.spatial import cKDTree
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
+from smlmlp import analysis
 
 
-# %% Function
+
 @analysis(df_name="points")
 def associate_consecutive_frames(
     xx,
@@ -31,22 +30,31 @@ def associate_consecutive_frames(
     parallel=False,
 ):
     """
-    Associate localizations in consecutive frames using:
-    - 2D cKDTree candidate search on x/y
-    - optional independent z validation
-    - connected components
-    - Hungarian assignment only when needed
-    
-    A link is valid if:
-        xy_distance <= min(association_radius_nm_i, association_radius_nm_j)
+    Associate localizations across consecutive frames.
 
-    and, if z is provided:
-        abs(z_i - z_j) <= min(z_association_radius_nm_i, z_association_radius_nm_j)
+    Parameters
+    ----------
+    xx, yy : array-like
+        Localization coordinates.
+    fr : array-like
+        Frame identifiers.
+    zz : array-like or None, optional
+        Optional z coordinates used for independent z validation.
+    association_radius_nm : float or array-like, optional
+        Maximum xy link radius.
+    z_association_radius_nm : float or array-like, optional
+        Maximum z link radius when ``zz`` is provided.
+    cuda, parallel : bool or int, optional
+        Execution options accepted by all analysis functions.
+
+    Returns
+    -------
+    tracks : ndarray
+        One-based track identifiers per localization.
+    info : dict
+        Link and track diagnostics.
     """
 
-    # --------------------------------------------------------------
-    # Normalize parallel argument
-    # --------------------------------------------------------------
     if parallel is False or parallel == 1:
         n_jobs = 1
     elif parallel is True or parallel == -1:
@@ -56,9 +64,6 @@ def associate_consecutive_frames(
     else:
         raise ValueError("Invalid value for 'parallel'")
 
-    # --------------------------------------------------------------
-    # Input conversion
-    # --------------------------------------------------------------
     x = np.asarray(xx, dtype=np.float32)
     y = np.asarray(yy, dtype=np.float32)
     fr = np.asarray(fr, dtype=np.uint32)
@@ -66,7 +71,16 @@ def associate_consecutive_frames(
     n = len(fr)
 
     if n == 0:
-        return np.empty(0, dtype=np.uint32)
+        info = {
+            "n_localizations": 0,
+            "n_links": 0,
+            "n_tracks": 0,
+            "mean_track_length": np.nan,
+            "link_ratio": np.nan,
+            "links_per_frame": np.empty(0, dtype=np.int64),
+            "locs_per_frame": np.empty(0, dtype=np.int64),
+        }
+        return np.empty(0, dtype=np.uint64), info
 
     if np.ndim(association_radius_nm) == 0:
         association_radius_nm = np.full(n, association_radius_nm, dtype=np.float32)
@@ -86,9 +100,6 @@ def associate_consecutive_frames(
         z = None
         z_association_radius_nm = None
 
-    # --------------------------------------------------------------
-    # Sort by frame
-    # --------------------------------------------------------------
     order = np.argsort(fr, kind="stable")
 
     xs = x[order]
@@ -109,10 +120,8 @@ def associate_consecutive_frames(
         return_counts=True,
     )
 
-    # --------------------------------------------------------------
-    # Worker function
-    # --------------------------------------------------------------
     def _associate_one(k):
+        """Associate one pair of consecutive frames."""
 
         if unique[k + 1] != unique[k] + 1:
             return np.empty(0, dtype=np.uint32), np.empty(0, dtype=np.uint32)
@@ -240,9 +249,6 @@ def associate_consecutive_frames(
 
         return a0 + np.array(accepted_a), b0 + np.array(accepted_b)
 
-    # --------------------------------------------------------------
-    # Run (parallel or not)
-    # --------------------------------------------------------------
     if n_jobs == 1:
         links = [_associate_one(k) for k in range(len(unique) - 1)]
     else:
@@ -250,9 +256,6 @@ def associate_consecutive_frames(
             delayed(_associate_one)(k) for k in range(len(unique) - 1)
         )
 
-    # --------------------------------------------------------------
-    # Merge links into graph
-    # --------------------------------------------------------------
     src = []
     dst = []
 
@@ -265,7 +268,16 @@ def associate_consecutive_frames(
         out = np.arange(n)
         out_original = np.empty_like(out)
         out_original[order] = out
-        return out_original
+        info = {
+            "n_localizations": n,
+            "n_links": 0,
+            "n_tracks": n,
+            "mean_track_length": 1.0,
+            "link_ratio": 0.0,
+            "links_per_frame": np.array([0 for _ in links]),
+            "locs_per_frame": counts,
+        }
+        return out_original.astype(np.uint64) + 1, info
 
     src = np.concatenate(src)
     dst = np.concatenate(dst)

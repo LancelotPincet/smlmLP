@@ -4,14 +4,12 @@
 # GitHub        : https://github.com/LancelotPincet
 
 
-# %% Libraries
-from smlmlp import analysis
 import numpy as np
 import numba as nb
 from arrlp import nb_threads
+from smlmlp import analysis
 
 
-# %% Function
 @analysis(df_name="points")
 def aggregate_ratio(
     col,
@@ -25,14 +23,27 @@ def aggregate_ratio(
     parallel=False,
 ):
     """
-    Calculate ratio_x and ratio_y for each point.
+    Calculate channel ratios for each point.
 
-    Rules
-    -----
-    1. For each point, ratio_x = sum col over x_channels
-    2. For each point, ratio_y = sum col over y_channels
-    3. If one requested channel is missing for a point -> NaN
-    4. If one requested channel appears several times for a point -> error
+    Parameters
+    ----------
+    col : array-like
+        Channel values to aggregate.
+    pnt : array-like
+        Point identifiers.
+    ch : array-like
+        Channel identifiers.
+    x_channels, y_channels : array-like or None, optional
+        Channels summed into the returned x and y ratios.
+    cuda, parallel : bool, optional
+        Execution options accepted by all analysis functions.
+
+    Returns
+    -------
+    ratio_x, ratio_y : ndarray
+        Summed values per point, with NaN for incomplete channel sets.
+    info : dict
+        Empty diagnostics dictionary.
     """
 
     col = np.asarray(col, dtype=np.float32)
@@ -45,16 +56,13 @@ def aggregate_ratio(
     x_channels = np.asarray(x_channels, dtype=np.uint32)
     y_channels = np.asarray(y_channels, dtype=np.uint32)
 
-    n = len(pnt)
-
-    # Sort by point first, then channel
     order = np.lexsort((ch, pnt))
 
     pnt_s = pnt[order]
     ch_s = ch[order]
     col_s = col[order]
 
-    unique_point, start, counts = np.unique(
+    _, start, counts = np.unique(
         pnt_s,
         return_index=True,
         return_counts=True,
@@ -70,7 +78,8 @@ def aggregate_ratio(
             y_channels,
         )
 
-    return ratio_x, ratio_y, {}
+    info = {}
+    return ratio_x, ratio_y, info
 
 
 @nb.njit(cache=True, parallel=True)
@@ -82,6 +91,7 @@ def _aggregate_ratio(
     x_channels,
     y_channels,
 ):
+    """Aggregate channel sums per sorted point."""
     n_points = len(start)
 
     ratio_x = np.empty(n_points, dtype=np.float32)

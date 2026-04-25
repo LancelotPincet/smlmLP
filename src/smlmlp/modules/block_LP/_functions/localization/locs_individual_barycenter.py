@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import get_xp, nb_threads
 import numpy as np
@@ -14,7 +13,6 @@ from numba import cuda as nb_cuda
 
 
 
-# %% Function
 @block()
 def locs_individual_barycenter(
     crops,
@@ -51,9 +49,17 @@ def locs_individual_barycenter(
 
     Returns
     -------
-    tuple of ndarray
-        A tuple ``(mux, muy)`` with all localized x and y coordinates in
-        nanometers, concatenated across channels.
+    tuple
+        A tuple ``(mux, muy, info)`` where:
+
+        - ``mux`` is the concatenated x localization array in nanometers,
+        - ``muy`` is the concatenated y localization array in nanometers,
+        - ``info`` is a dictionary containing reusable intermediate results.
+
+        The dictionary contains the following keys:
+
+        ``'channels_pixels_nm'``
+            Normalized per-channel pixel sizes used for coordinate conversion.
 
     Examples
     --------
@@ -61,12 +67,12 @@ def locs_individual_barycenter(
     >>> crops = [np.random.rand(3, 5, 5).astype(np.float32)]
     >>> x0 = [np.array([10, 20, 30], dtype=np.float32)]
     >>> y0 = [np.array([5, 15, 25], dtype=np.float32)]
-    >>> mux, muy = locs_individual_barycenter(crops, x0, y0)
+    >>> mux, muy, info = locs_individual_barycenter(crops, x0, y0)
     >>> mux.shape == muy.shape
     True
 
     >>> pix = [(100.0, 120.0)]
-    >>> mux, muy = locs_individual_barycenter(crops, x0, y0, channels_pixels_nm=pix)
+    >>> mux, muy, info = locs_individual_barycenter(crops, x0, y0, channels_pixels_nm=pix)
     >>> mux.ndim
     1
     """
@@ -108,7 +114,11 @@ def locs_individual_barycenter(
         mux_all.append(mux)
         muy_all.append(muy)
 
-    return np.hstack(mux_all), np.hstack(muy_all)
+    info = {
+        "channels_pixels_nm": channels_pixels_nm,
+    }
+
+    return np.hstack(mux_all), np.hstack(muy_all), info
 
 
 

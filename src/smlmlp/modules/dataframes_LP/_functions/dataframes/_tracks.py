@@ -5,20 +5,17 @@
 
 
 
-# %% Libraries
-from smlmlp import DataFrame, column
 import numpy as np
 
+from smlmlp import DataFrame, column
 
 
-# %% Function
 class tracks(DataFrame) :
-    '''
-    Tracks dataframe
-    '''
+    """Track-level dataframe aggregated from points."""
 
     @column(headers=['track'], dtype=np.uint64, save=True, agg='min', index="points")
     def trk(self) :
+        """Associate consecutive frames into track identifiers."""
         from smlmlp import associate_consecutive_frames
-        return associate_consecutive_frames(association_radius_nm=self.config.track_association_radius_nm, z=None, locs=self.locs)[0]
 
+        return associate_consecutive_frames(association_radius_nm=self.config.track_association_radius_nm, z=None, locs=self.locs)[0]

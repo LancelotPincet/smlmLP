@@ -5,20 +5,17 @@
 
 
 
-# %% Libraries
-from smlmlp import DataFrame, column
 import numpy as np
 
+from smlmlp import DataFrame, column
 
 
-# %% Function
 class molecules(DataFrame) :
-    '''
-    Molecules dataframe
-    '''
+    """Molecule-level dataframe aggregated from blinks."""
 
     @column(headers=['molecule'], dtype=np.uint64, save=True, agg='min', index="blinks")
     def mol(self) :
+        """Associate blinks into molecule identifiers."""
         from smlmlp import associate_molecules
-        return associate_molecules(locs=self.locs)[0]
 
+        return associate_molecules(locs=self.locs)[0]

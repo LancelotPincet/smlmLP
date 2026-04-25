@@ -12,7 +12,6 @@ This function is a decorator to be used on block function, which allow to use co
 
 
 
-# %% Libraries
 import functools
 import time
 import inspect
@@ -20,7 +19,6 @@ from smlmlp import metadatum
 
 
 
-# %% Function
 def block(timeit=True) :
     '''
     This function is a decorator to be used on block function, which allow to use config for default values.
@@ -46,9 +44,11 @@ def block(timeit=True) :
     '''
 
     def decorator(function) :
+        """Create the decorated callable."""
         name = function.__name__
         @functools.wraps(function)
         def wrapper(*args, config=None, **kwargs) -> None :
+            """Call the wrapped function with normalized arguments."""
 
             # Manages kwargs from config and locs
             kwargs = {key: value for key, value in kwargs.items() if value is not None}
@@ -81,6 +81,7 @@ def block(timeit=True) :
             
             # If is a generator
             def generator_wrapper():
+                """Yield values while measuring generator execution time."""
                 while True:
                     try:
                         tic = time.perf_counter()
@@ -102,7 +103,6 @@ block.times = {}
 
 
 
-# %% Test function run
 if __name__ == "__main__":
     from corelp import test
     test(__file__)

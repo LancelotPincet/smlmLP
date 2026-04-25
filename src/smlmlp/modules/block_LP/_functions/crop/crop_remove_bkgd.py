@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import get_xp, nb_threads
 import bottleneck as bn
@@ -14,7 +13,6 @@ from numba import cuda as nb_cuda
 
 
 
-# %% Function
 @block()
 def crop_remove_bkgd(crops, /, *, cuda=False, parallel=False):
     """

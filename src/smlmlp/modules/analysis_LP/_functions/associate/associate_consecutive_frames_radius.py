@@ -5,15 +5,13 @@
 
 
 
-# %% Libraries
-from smlmlp import analysis
 import numpy as np
-from scipy.spatial import cKDTree
 from scipy.signal import find_peaks
+from scipy.spatial import cKDTree
+from smlmlp import analysis
 
 
 
-# %% Function
 @analysis(df_name="points")
 def associate_consecutive_frames_radius(
     xx,
@@ -28,33 +26,24 @@ def associate_consecutive_frames_radius(
     parallel=False,
 ):
     """
-    Estimate a fixed xy association radius from nearest-neighbor distances
-    between consecutive frames.
-
-    The idea is to find the valley between:
-        - short-distance peak: same blink / localization precision
-        - long-distance peak: random nearby localization
+    Estimate an xy association radius from consecutive frames.
 
     Parameters
     ----------
-    x, y : array-like
+    xx, yy : array-like
         Localization coordinates.
-
     fr : array-like
         Frame index.
-
-    bins : int
+    bins : int, optional
         Number of logarithmic histogram bins.
-
-    r_min : float
+    r_min : float, optional
         Minimum distance considered.
-
-    r_max : float or None
-        Maximum distance considered.
-        If None, uses max observed nearest-neighbor distance.
-
-    smooth : int
+    r_max : float or None, optional
+        Maximum distance considered. If None, uses a high percentile.
+    smooth : int, optional
         Moving-average smoothing window on the histogram.
+    cuda, parallel : bool, optional
+        Execution options accepted by all analysis functions.
 
     Returns
     -------
@@ -125,20 +114,17 @@ def associate_consecutive_frames_radius(
     if len(distances) == 0:
         raise ValueError("No distances remain after r_min/r_max filtering.")
 
-    # Log-spaced histogram
     edges = np.logspace(np.log10(r_min), np.log10(r_max), bins + 1)
     hist, edges = np.histogram(distances, bins=edges)
 
     centers = np.sqrt(edges[:-1] * edges[1:])
 
-    # Smooth histogram
     hist_smooth = hist.astype(np.float32)
 
     if smooth > 1:
         kernel = np.ones(smooth, dtype=np.float32) / smooth
         hist_smooth = np.convolve(hist_smooth, kernel, mode="same")
 
-    # Find peaks in log-distance histogram
     peaks, _ = find_peaks(hist_smooth)
 
     if len(peaks) >= 2:

@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import sortloop, get_xp, nb_threads
 import numpy as np
@@ -14,7 +13,6 @@ from numba import cuda as nb_cuda
 
 
 
-# %% Function
 @block()
 def crop_individual_extract(
     channels,

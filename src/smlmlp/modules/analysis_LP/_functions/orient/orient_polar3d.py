@@ -5,18 +5,17 @@
 
 
 
-# %% Libraries
 from smlmlp import analysis
-import numpy as np
-import numba as nb
 
 
-
-# %% Function
 @analysis(df_name="detections")
 def orient_polar3d(x_eff, y_eff, intensity, *, cuda=False, parallel=False) :
-    '''
-    TODO.
-    '''
-    raise SyntaxeError('Not implemented')
-    None, None, {}
+    """
+    Placeholder for orient polar3d.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this analysis is not implemented yet.
+    """
+    raise SyntaxError("Not implemented yet.")

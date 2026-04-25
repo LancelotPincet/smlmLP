@@ -5,17 +5,17 @@
 
 
 
-# %% Libraries
 from smlmlp import analysis
-import numpy as np
-import numba as nb
 
 
-
-# %% Function
 @analysis(df_name="detections")
 def analysis_template(x, y, *, cuda=False, parallel=False) :
-    '''
-    TODO.
-    '''
-    pass
+    """
+    Placeholder for analysis template.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this analysis is not implemented yet.
+    """
+    raise SyntaxError("Not implemented yet.")

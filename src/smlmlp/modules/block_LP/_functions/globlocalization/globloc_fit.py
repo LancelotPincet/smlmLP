@@ -3,16 +3,10 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
 from smlmlp import block
-from arrlp import img_crosscorr, get_xp
-import numpy as np
 
 
 
-# %% Function
 @block()
 def globloc_fit(
     crops,
@@ -34,7 +28,47 @@ def globloc_fit(
     cuda=False,
     parallel=False,
 ):
+    """Fit global localizations from channel crops.
+
+    Parameters
+    ----------
+    crops : sequence of ndarray
+        Crop stacks to fit.
+    X0 : sequence of ndarray
+        Crop x origins.
+    Y0 : sequence of ndarray
+        Crop y origins.
+    x_shift_nm, y_shift_nm : float, optional
+        Global translation parameters in nanometers.
+    rotation_deg : float, optional
+        Global rotation angle in degrees.
+    x_shear, y_shear : float, optional
+        Global shear parameters.
+    optimizer : str, optional
+        Optimizer key.
+    estimator : str, optional
+        Estimator key.
+    distribution : str, optional
+        Distribution key used by the estimator.
+    channels_pixels_nm : float or sequence, optional
+        Pixel size specification per channel.
+    channels_gains : float or sequence, optional
+        Gain value(s) used for fitted amplitudes.
+    channels_QE : float or sequence, optional
+        Quantum efficiency value(s) used for fitted amplitudes.
+    cuda : bool, optional
+        Whether to use CUDA execution.
+    parallel : bool, optional
+        Whether to use parallel execution.
+
+    Returns
+    -------
+    tuple
+        A tuple whose last item is an ``info`` dictionary.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this block is not implemented.
     """
-    Create from the channels list the global channel where to do detections.
-    """
-    TODO
+    raise SyntaxError("Not implemented yet.")

@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block, Config
 from arrlp import get_xp, nb_threads
 import numba as nb
@@ -15,7 +14,6 @@ import math
 
 
 
-# %% Function
 @block()
 def detect_spatial_maxima(
     snrs,

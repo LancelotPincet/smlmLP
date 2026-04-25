@@ -3,18 +3,31 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
-from smlmlp import columns
-from warnings import warn
 from contextlib import nullcontext
 
+from warnings import warn
 
+from smlmlp import columns
 
 def open_df(locs, df, printer=None) :
+    """
+    Open one pandas dataframe into a Locs object.
 
-    # Get dataframe instance
+    Parameters
+    ----------
+    locs : Locs
+        Localization container to receive dataframe values.
+    df : pandas.DataFrame
+        Source dataframe. Its index name selects the destination dataframe.
+    printer : object or None, default=None
+        Optional object exposing a ``timeit`` context manager.
+
+    Returns
+    -------
+    None
+        Data are assigned to ``locs`` in place.
+    """
+
     index = df.index.name
     if index is not None :
         index = index.replace('"', '')
@@ -35,6 +48,7 @@ def open_df(locs, df, printer=None) :
         for header in df.columns :
             if header not in columns.headers :
                 warn(f'Skipping opening unknown column with header "{header}"')
+                continue
             col = columns.headers[header]
             if col is col_index : continue
             col_name = col.col

@@ -5,18 +5,17 @@
 
 
 
-# %% Libraries
 from smlmlp import analysis
-import numpy as np
-import numba as nb
 
 
-
-# %% Function
 @analysis(df_name="blinks")
 def image_smlm3d(col, /, xx, yy, crlb=None, *, pixel_smlm=15., cuda=False, parallel=False) :
-    '''
-    TODO.
-    '''
-    raise SyntaxeError('Not implemented')
-    None, {}
+    """
+    Placeholder for image smlm3d.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this analysis is not implemented yet.
+    """
+    raise SyntaxError("Not implemented yet.")

@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import get_xp, nb_threads
 import numba as nb
@@ -14,7 +13,6 @@ import math
 
 
 
-# %% Function
 @block()
 def detect_snr(
     signals,
@@ -116,7 +114,7 @@ def detect_snr(
             )
     except TypeError:
         channels_gains = [
-            (channels_gains, channels_gains)
+            channels_gains
             for _ in range(len(signals))
         ]
 

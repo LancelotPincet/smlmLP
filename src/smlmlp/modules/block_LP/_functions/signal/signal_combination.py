@@ -5,13 +5,11 @@
 
 
 
-# %% Libraries
 from smlmlp import block, signal_spatial_filter, signal_temporal_filter
 from arrlp import gc
 
 
 
-# %% Function
 @block(timeit=False)
 def signal_combination(
     channels,

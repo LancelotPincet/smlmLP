@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from contextlib import ExitStack
 from arrlp import gc
@@ -16,7 +15,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 
-# %% Function
 @block()
 def load_data(
     *tif_paths,
@@ -25,6 +23,8 @@ def load_data(
     cameras_bboxeses=None,
     memmap=True,
     flip=None,
+    cuda=False,
+    parallel=False,
     iterator=range,
 ):
     """
@@ -45,7 +45,7 @@ def load_data(
     pad : int, optional
         Number of frames of temporal padding to include before and after each
         chunk.
-    cameras_bboxes : sequence or None, optional
+    cameras_bboxeses : sequence or None, optional
         Per-file list of channel bounding boxes. For each file, each bounding
         box must be given as ``(x0, y0, x1, y1)`` and will be applied as
         ``[:, y0:y1, x0:x1]``.
@@ -54,6 +54,10 @@ def load_data(
     flip : sequence or None, optional
         Optional per-channel flip configuration. Each entry must be a pair
         ``(flip_y, flip_x)`` of booleans.
+    cuda : bool, optional
+        Unused in this function. It is kept for block API consistency.
+    parallel : bool, optional
+        Unused in this function. It is kept for block API consistency.
     iterator : callable, optional
         Iterator factory used to loop over chunk indices. This can be used,
         for example, to wrap the iteration with a progress bar.
@@ -117,10 +121,12 @@ def load_data(
     ...     "cam2.tif",
     ...     chunk=500,
     ...     pad=20,
-    ...     cameras_bboxes=bbox,
+    ...     cameras_bboxeses=bbox,
     ... ):
     ...     print(info["chunk0"], info["chunk1"], len(channels))
     """
+    cameras_bboxes = cameras_bboxeses
+
     with ExitStack() as stack:
         # Reset timings stored by the block decorator machinery.
         block.times = {}

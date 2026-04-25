@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from funclp import LM, MLE, LSE, Poisson, Normal, Gaussian2D
 from arrlp import get_xp, nb_threads, coordinates
@@ -15,7 +14,6 @@ SIGMA = 0.21 * 670 / 1.5
 
 
 
-# %% Function
 @block()
 def locs_individual_gaussfit(
     crops,
@@ -79,13 +77,13 @@ def locs_individual_gaussfit(
     Returns
     -------
     tuple
-        A tuple ``(mux, muy, output)`` where:
+        A tuple ``(mux, muy, info)`` where:
 
         - ``mux`` is the concatenated x localization array in nanometers,
         - ``muy`` is the concatenated y localization array in nanometers,
-        - ``output`` is a dictionary with fitted parameter arrays.
+        - ``info`` is a dictionary with fitted parameter arrays.
 
-        ``output`` contains:
+        ``info`` contains:
 
         ``'amp'``
             Concatenated converted amplitudes.
@@ -102,7 +100,7 @@ def locs_individual_gaussfit(
     >>> crops = [np.random.rand(2, 7, 7).astype(np.float32)]
     >>> x0 = [np.array([10, 20], dtype=np.float32)]
     >>> y0 = [np.array([30, 40], dtype=np.float32)]
-    >>> mux, muy, output = locs_individual_gaussfit(
+    >>> mux, muy, info = locs_individual_gaussfit(
     ...     crops,
     ...     x0,
     ...     y0,
@@ -112,10 +110,10 @@ def locs_individual_gaussfit(
     ... )
     >>> mux.shape == muy.shape
     True
-    >>> sorted(output)
+    >>> sorted(info)
     ['amp', 'offset', 'sigmax', 'sigmay']
 
-    >>> mux, muy, output = locs_individual_gaussfit(
+    >>> mux, muy, info = locs_individual_gaussfit(
     ...     crops,
     ...     x0,
     ...     y0,
@@ -125,7 +123,7 @@ def locs_individual_gaussfit(
     ...     channels_psf_theta_deg=[5.0],
     ...     channels_fit_theta=True,
     ... )
-    >>> output['sigmax'].ndim
+    >>> info['sigmax'].ndim
     1
     """
     n_channels = len(crops)
@@ -167,7 +165,7 @@ def locs_individual_gaussfit(
             pixy=pixel[0],
             theta_fit=fit_theta,
         )
-        for pixel, sigx, sigy, theta in zip(
+        for pixel, sigx, sigy, theta, fit_theta in zip(
             channels_pixels_nm,
             channels_psf_xsigmas_nm,
             channels_psf_ysigmas_nm,
@@ -246,14 +244,14 @@ def locs_individual_gaussfit(
         sigmax_all.append(sigx)
         sigmay_all.append(sigy)
 
-    output = {
+    info = {
         "amp": np.hstack(amp_all),
         "offset": np.hstack(offset_all),
         "sigmax": np.hstack(sigmax_all),
         "sigmay": np.hstack(sigmay_all),
     }
 
-    return np.hstack(mux_all), np.hstack(muy_all), output
+    return np.hstack(mux_all), np.hstack(muy_all), info
 
 
 
@@ -336,4 +334,3 @@ def _normalize_psf_parameter(values, n_channels):
         values = [values for _ in range(n_channels)]
 
     return values
-

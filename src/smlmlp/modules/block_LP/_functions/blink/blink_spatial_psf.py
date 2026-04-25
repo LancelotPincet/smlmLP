@@ -5,8 +5,7 @@
 
 
 
-# %% Libraries
-from smlmlp import block, Config
+from smlmlp import block
 from arrlp import gc, get_xp, img_autocorr, img_fft, img_ifft, coordinates
 import bottleneck as bn
 from funclp import Gaussian2D, Spline2D
@@ -15,7 +14,6 @@ from scipy.optimize import curve_fit
 
 
 
-# %% Function
 @block(timeit=False)
 def blink_spatial_psf(
     channels,

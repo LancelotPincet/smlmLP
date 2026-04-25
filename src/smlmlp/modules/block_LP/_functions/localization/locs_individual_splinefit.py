@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from funclp import LM, MLE, LSE, Poisson, Normal, Spline3D
 from arrlp import get_xp, nb_threads, coordinates
@@ -15,7 +14,6 @@ SIGMA = 0.21 * 670 / 1.5
 
 
 
-# %% Function
 @block()
 def locs_individual_splinefit(
     crops,
@@ -172,7 +170,7 @@ def locs_individual_splinefit(
             coeffs=coeffs,
         )
         for tx, ty, tz, coeffs in zip(
-            channels_psf_coeffs,
+            channels_psf_xtangents,
             channels_psf_ytangents,
             channels_psf_ztangents,
             channels_psf_coeffs,

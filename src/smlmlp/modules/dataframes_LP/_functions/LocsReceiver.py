@@ -3,9 +3,7 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
 class LocsReceiver() :
-    ''' Parent Locs class which receives dataframes properties '''
+    """Base Locs class receiving dynamic dataframe properties."""
+
     pass

@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import img_greyopening, kernel
 import numpy as np
 
 
 
-# %% Function
 @block()
 def bkgd_spatial_opening(
     channels,

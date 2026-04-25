@@ -12,68 +12,210 @@ This file allows to test block
 block : This function is a decorator to be used on block function, which allow to use config for default values.
 """
 
+import importlib
 
-
-# %% Libraries
-from corelp import debug
+import numpy as np
 import pytest
-from smlmlp import block
-debug_folder = debug(__file__)
+import tifffile as tiff
+
+import smlmlp.modules.block_LP._functions.blink.blink_temporal_on as blink_temporal_on_module
+from smlmlp.modules.block_LP.block import block
+from smlmlp.modules.block_LP._functions.detection.detect_snr import detect_snr
+from smlmlp.modules.block_LP._functions.loading.load_data import load_data
+from smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant import (
+    registrate_solve_redundant,
+)
 
 
+class _Config:
+    """Minimal config object used by decorator tests."""
 
-# %% Function test
-def test_function() :
-    '''
-    Test block function
-    '''
-    print('Hello world!')
+    scale = 3
+    offset = 2
 
 
+def test_block_injects_config_values_and_returns_info():
+    """Check config injection and the standardized block return shape."""
 
-# %% Instance fixture
-@pytest.fixture()
-def instance() :
-    '''
-    Create a new instance at each test function
-    '''
-    return block()
+    @block(timeit=False)
+    def scaled(value, /, scale=1, *, offset=0, cuda=False, parallel=False):
+        """Scale a value and return an ``info`` dictionary.
 
-def test_instance(instance) :
-    '''
-    Test on fixture
-    '''
-    pass
+        Parameters
+        ----------
+        value : int
+            Input value.
+        scale : int, optional
+            Multiplicative scale.
+        offset : int, optional
+            Additive offset.
+        cuda : bool, optional
+            Whether CUDA execution was requested.
+        parallel : bool, optional
+            Whether parallel execution was requested.
 
+        Returns
+        -------
+        tuple
+            A tuple ``(result, info)``.
+        """
+        info = {"cuda": cuda, "parallel": parallel, "scale": scale}
+        return value * scale + offset, info
 
-# %% Returns test
-@pytest.mark.parametrize("args, kwargs, expected, message", [
-    #([], {}, None, ""),
-    ([], {}, None, ""),
-])
-def test_returns(args, kwargs, expected, message) :
-    '''
-    Test block return values
-    '''
-    assert block(*args, **kwargs) == expected, message
+    result, info = scaled(4, config=_Config())
 
-
-
-# %% Error test
-@pytest.mark.parametrize("args, kwargs, error, error_message", [
-    #([], {}, None, ""),
-    ([], {}, None, ""),
-])
-def test_errors(args, kwargs, error, error_message) :
-    '''
-    Test block error values
-    '''
-    with pytest.raises(error, match=error_message) :
-        block(*args, **kwargs)
+    assert result == 14
+    assert info == {"cuda": False, "parallel": False, "scale": 3}
 
 
+def test_block_wraps_generators_and_tracks_time():
+    """Check generator blocks preserve yielded tuples and timing."""
 
-# %% Test function run
+    @block(timeit=True)
+    def generate(*, cuda=False, parallel=False):
+        """Yield values with an ``info`` dictionary.
+
+        Parameters
+        ----------
+        cuda : bool, optional
+            Whether CUDA execution was requested.
+        parallel : bool, optional
+            Whether parallel execution was requested.
+
+        Yields
+        ------
+        tuple
+            A tuple ``(value, info)``.
+        """
+        for value in (1, 2):
+            info = {"cuda": cuda, "parallel": parallel}
+            yield value, info
+
+    block.times.pop("generate", None)
+    values = list(generate(cuda=False, parallel=False))
+
+    assert values == [
+        (1, {"cuda": False, "parallel": False}),
+        (2, {"cuda": False, "parallel": False}),
+    ]
+    assert block.times["generate"] >= 0
+
+
+def test_registrate_solve_redundant_returns_info_last():
+    """Check an implemented block returns an info dict as the final item."""
+
+    shiftx = np.array([1.0, 2.0, 1.0], dtype=np.float32)
+    shifty = np.array([0.0, 1.0, 1.0], dtype=np.float32)
+
+    abs_shiftx, abs_shifty, info = registrate_solve_redundant(shiftx, shifty)
+
+    assert abs_shiftx.shape == (3,)
+    assert abs_shifty.shape == (3,)
+    assert isinstance(info, dict)
+    assert info["pairs"] == [(0, 1), (0, 2), (1, 2)]
+
+
+def test_load_data_yields_chunk_with_public_bbox_parameter(tmp_path):
+    """Check TIFF loading uses the public bounding-box parameter."""
+    path = tmp_path / "movie.tif"
+    stack = np.arange(3 * 4 * 5, dtype=np.uint16).reshape(3, 4, 5)
+    tiff.imwrite(path, stack, photometric="minisblack")
+
+    chunks = list(
+        load_data(
+            str(path),
+            chunk=2,
+            pad=0,
+            cameras_bboxeses=[[(1, 1, 4, 3)]],
+            memmap=True,
+        )
+    )
+
+    assert len(chunks) == 2
+    channels, info = chunks[0]
+    assert info["chunk0"] == 0
+    assert info["chunk1"] == 1
+    np.testing.assert_array_equal(channels[0], stack[:2, 1:3, 1:4])
+
+
+def test_detect_snr_accepts_scalar_gain():
+    """Check scalar gains are broadcast per channel."""
+    signals = [np.array([[10.0, 20.0]], dtype=np.float32)]
+    bkgds = [np.array([[4.0, 4.0]], dtype=np.float32)]
+
+    snrs, info = detect_snr(signals, bkgds, channels_gains=1.0, parallel=False)
+
+    np.testing.assert_allclose(snrs[0], [[5.0, 10.0]])
+    assert info["channels_gains"] == [1.0]
+
+
+def test_blink_temporal_on_normalizes_scalar_psf_and_default_crop(monkeypatch):
+    """Check default crop length is derived from frames, not channel count."""
+    channel = np.ones((10, 2, 2), dtype=np.float32)
+    autocorr = np.tile(np.arange(10, 0, -1, dtype=np.float32)[:, None, None], (1, 2, 2))
+
+    monkeypatch.setattr(
+        blink_temporal_on_module,
+        "img_gaussianfilter",
+        lambda channel, **kwargs: np.zeros_like(channel),
+    )
+    monkeypatch.setattr(
+        blink_temporal_on_module,
+        "stack_autocorr",
+        lambda channel, cuda=False, parallel=False: autocorr,
+    )
+    monkeypatch.setattr(
+        blink_temporal_on_module,
+        "curve_fit",
+        lambda func, T, y, p0, bounds: (np.array([2.0, 0.0]), None),
+    )
+
+    on_time, info = blink_temporal_on_module.blink_temporal_on(
+        [channel],
+        psf_sigma_nm=120.0,
+        exposure_ms=25.0,
+    )
+
+    assert on_time == 50.0
+    assert info["time"].tolist() == [0.0, 25.0, 50.0, 75.0]
+
+
+@pytest.mark.parametrize(
+    ("module_name", "function_name", "args"),
+    [
+        (
+            "smlmlp.modules.block_LP._functions._block_template",
+            "block_template",
+            ([],),
+        ),
+        (
+            "smlmlp.modules.block_LP._functions.globdetection.globdet_channel",
+            "globdet_channels",
+            ([],),
+        ),
+        (
+            "smlmlp.modules.block_LP._functions.globlocalization.globloc_fit",
+            "globloc_fit",
+            ([], [], []),
+        ),
+        (
+            "smlmlp.modules.block_LP._functions.registration.registrate_ecc_affine",
+            "registrate_ecc_shift",
+            ([],),
+        ),
+    ],
+)
+def test_unimplemented_blocks_raise_standard_error(module_name, function_name, args):
+    """Check placeholder blocks fail explicitly."""
+
+    module = importlib.import_module(module_name)
+    function = getattr(module, function_name)
+
+    with pytest.raises(SyntaxError, match="Not implemented yet"):
+        function(*args)
+
+
 if __name__ == "__main__":
     from corelp import test
+
     test(__file__)

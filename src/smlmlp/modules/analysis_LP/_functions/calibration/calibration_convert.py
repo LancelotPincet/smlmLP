@@ -5,18 +5,17 @@
 
 
 
-# %% Libraries
 from smlmlp import analysis
-import numpy as np
-import numba as nb
 
 
-
-# %% Function
 @analysis(df_name="points")
 def calibration_convert(col, calibration, /,  *, cuda=False, parallel=False) :
-    '''
-    TODO.
-    '''
-    raise SyntaxeError('Not implemented')
-    None, None, {}
+    """
+    Placeholder for calibration convert.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this analysis is not implemented yet.
+    """
+    raise SyntaxError("Not implemented yet.")

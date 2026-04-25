@@ -3,24 +3,26 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
 import pandas as pd
+
 from smlmlp import BaseDataFrame
 
 
 
-# %% Function
-class MainDataFrame(BaseDataFrame) : # This class is here to host dynamic main dataframe columns functions
-    '''
-    Localization main dataframe
-    '''
+class MainDataFrame(BaseDataFrame) :
+    """
+    Main detections dataframe hosting dynamic column descriptors.
+
+    Parameters
+    ----------
+    locs : Locs
+        Parent localization container.
+    """
 
     def __init__(self, locs) :
+        """Initialize the object."""
         super().__init__(locs)
         pd.DataFrame.__init__(self, index=pd.RangeIndex(start=1, stop=1, step=1))
         self.index.name = self.index_header
 
-    # Attributes
-    head2save = [] # detections dataframe head2save
+    head2save = []

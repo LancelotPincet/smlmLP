@@ -4,14 +4,12 @@
 # GitHub        : https://github.com/LancelotPincet
 
 
-# %% Libraries
 from smlmlp import analysis
 import numpy as np
 import numba as nb
 from arrlp import nb_threads
 
 
-# %% Functions
 @analysis(df_name="detections")
 def inv_transform_locs(
     x,
@@ -23,17 +21,25 @@ def inv_transform_locs(
     parallel=False,
 ):
     """
-    Transform localizations from aligned coordinates back to non-aligned coordinates.
+    Transform localizations back to non-aligned coordinates.
 
-    matrices are still defined in the direction:
-        non-aligned -> aligned
+    Parameters
+    ----------
+    x, y : array-like
+        Localization coordinates in aligned coordinates.
+    ch : array-like
+        One-based channel identifiers used to select transform matrices.
+    channels_locs_transform_matrices : array-like
+        Matrices defined from non-aligned to aligned coordinates.
+    cuda, parallel : bool, optional
+        Execution options accepted by all analysis functions.
 
-    This function applies the inverse matrix.
-
-    Matrix convention:
-        [y_old, x_old, 1] = inv(matrix) @ [y_aligned, x_aligned, 1]
-
-    Coordinates and matrix shifts are both in nm.
+    Returns
+    -------
+    x_t, y_t : ndarray
+        Inverse-transformed coordinates.
+    info : dict
+        Empty diagnostics dictionary.
     """
 
     x = np.asarray(x, dtype=np.float32)
@@ -46,7 +52,7 @@ def inv_transform_locs(
 
     inv_matrices = np.empty_like(channels_locs_transform_matrices)
 
-    for i in range(len(matrices)):
+    for i in range(len(channels_locs_transform_matrices)):
         inv_matrices[i] = np.linalg.inv(channels_locs_transform_matrices[i]).astype(np.float32)
 
     with nb_threads(parallel):
@@ -57,7 +63,8 @@ def inv_transform_locs(
             inv_matrices,
         )
 
-    return x_t, y_t, {}
+    info = {}
+    return x_t, y_t, info
 
 @nb.njit(cache=True, parallel=True)
 def _transform_locs(
@@ -66,6 +73,7 @@ def _transform_locs(
     ch,
     matrices,
 ):
+    """Apply per-channel affine transforms."""
     n = len(x)
 
     x_t = np.empty(n, dtype=np.float32)

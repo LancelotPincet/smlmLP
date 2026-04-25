@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 import numpy as np
 import bottleneck as bn
 
 
 
-# %% Function
 @block()
 def registrate_solve_redundant(
     shiftx,

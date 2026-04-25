@@ -5,13 +5,11 @@
 
 
 
-# %% Libraries
 from smlmlp import block, bkgd_spatial_opening, bkgd_temporal_median, bkgd_spatial_mean
 from arrlp import gc, get_xp
 
 
 
-# %% Function
 @block(timeit=False)
 def bkgd_combination(
     channels,

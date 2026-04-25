@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block, computer
 import tifffile as tiff
 import numpy as np
@@ -13,13 +12,11 @@ from corelp import Path
 
 
 
-# %% Constants
 _MIN_FRAME_SIZE_GB = 1e-12
 _MEMORY_COPY_FACTOR = 5
 
 
 
-# %% Function
 @block(timeit=False)
 def load_chunking(*tif_paths, cuda=False, parallel=False):
     """Estimate a safe frame chunk size from RAM/VRAM availability.

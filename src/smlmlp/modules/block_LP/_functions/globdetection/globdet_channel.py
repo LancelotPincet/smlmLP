@@ -3,16 +3,10 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
 from smlmlp import block
-from arrlp import img_crosscorr, get_xp
-import numpy as np
 
 
 
-# %% Function
 @block()
 def globdet_channels(
     channels,
@@ -25,7 +19,31 @@ def globdet_channels(
     cuda=False,
     parallel=False,
 ):
+    """Create a global channel for detection.
+
+    Parameters
+    ----------
+    channels : sequence of ndarray
+        Input channel images.
+    x_shift_nm, y_shift_nm : float, optional
+        Global translation parameters in nanometers.
+    rotation_deg : float, optional
+        Global rotation angle in degrees.
+    x_shear, y_shear : float, optional
+        Global shear parameters.
+    cuda : bool, optional
+        Whether to use CUDA execution.
+    parallel : bool, optional
+        Whether to use parallel execution.
+
+    Returns
+    -------
+    tuple
+        A tuple whose last item is an ``info`` dictionary.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this block is not implemented.
     """
-    Create from the channels list the global channel where to do detections.
-    """
-    TODO
+    raise SyntaxError("Not implemented yet.")

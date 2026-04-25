@@ -3,18 +3,31 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
 from smlmlp import block
-import numpy as np
 
 
 
-# %% Function
 @block()
 def block_template(channels, /, *, cuda=False, parallel=False):
+    """Block template placeholder.
+
+    Parameters
+    ----------
+    channels : sequence
+        Input channels.
+    cuda : bool, optional
+        Whether to use CUDA execution.
+    parallel : bool, optional
+        Whether to use parallel execution.
+
+    Returns
+    -------
+    tuple
+        A tuple whose last item is an ``info`` dictionary.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this template is not implemented.
     """
-    TODO
-    """
-    pass
+    raise SyntaxError("Not implemented yet.")

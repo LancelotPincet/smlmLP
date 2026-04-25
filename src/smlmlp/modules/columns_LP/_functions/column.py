@@ -21,6 +21,8 @@ class column:
     ----------
     headers : list[str]
         Possible file headers for this column. The first one is the canonical header.
+    dtype : type
+        Numpy dtype used when assigning this column.
     save : bool, default=True
         Whether this column should be saved.
     agg : str or callable, default='mean'
@@ -30,6 +32,7 @@ class column:
     """
 
     def __init__(self, *, headers, dtype, save=True, agg="mean", index=False):
+        """Initialize the object."""
         self.headers = headers
         self.header = headers[0]
         self.save = save
@@ -68,12 +71,10 @@ class column:
             cls.parent_name = self.index
             cls.df_name = self.df_name
 
-        # Register in owning class
         if not hasattr(cls, "columns_dict"):
             cls.columns_dict = {}
         cls.columns_dict[self.col] = self
 
-        # Saving headers
         if self.index:
             if not hasattr(MainDataFrame, "head2save"):
                 MainDataFrame.head2save = []
@@ -87,14 +88,13 @@ class column:
                 if header not in cls.head2save:
                     cls.head2save.append(header)
 
-        # Access to the column object through _<col>
         @property
         def _col(instance):
+            """Return col."""
             return self
 
         setattr(cls, f"_{self.col}", _col)
 
-        # Ownership flags
         if self.index or issubclass(cls, MainDataFrame):
             setattr(MainDataFrame, f"{self.col}_mine", True)
             setattr(DataFrame, f"{self.col}_mine", False)
@@ -102,10 +102,8 @@ class column:
             setattr(MainDataFrame, f"{self.col}_mine", False)
             setattr(DataFrame, f"{self.col}_mine", True)
 
-        # Install shared merge property on DataFrame for this column name
         self._install_dataframe_merge_property()
 
-        # Install main-dataframe-facing helpers for non-main dataframe columns
         if not issubclass(cls, MainDataFrame):
             if self.index:
                 self._install_index_property_on_main()
@@ -113,18 +111,19 @@ class column:
             else:
                 self._install_main_dataframe_spread_property()
 
-    # -------------------------------------------------------------------------
     # Internal helpers
-    # -------------------------------------------------------------------------
 
     def _printer_context(self, df, message):
+        """Handle printer context."""
         printer = getattr(df.locs, "printer", None)
         return printer.timeit(message) if printer is not None else nullcontext()
 
     def _coerce_array(self, value):
+        """Handle coerce array."""
         return np.asarray(value, dtype=self.dtype)
 
     def _drop_column(self, df, header):
+        """Handle drop column."""
         df.drop(columns=[header], inplace=True, errors="ignore")
 
     def _ensure_column_materialized(
@@ -233,9 +232,7 @@ class column:
 
         return dets[child.index_header].map(child[value_header]).to_numpy()
 
-    # -------------------------------------------------------------------------
     # Installation methods
-    # -------------------------------------------------------------------------
 
     def _install_dataframe_merge_property(self):
         """
@@ -249,6 +246,7 @@ class column:
 
         @property
         def merged_col(df):
+            """Return merged col."""
             with self._printer_context(
                 df, f"merging {self.header} from {df.parent_name} into {df.df_name}"
             ):
@@ -257,7 +255,6 @@ class column:
                     if parent is None:
                         return None
 
-                    # Ensure parent has the value column physically available
                     if self.header not in parent.columns:
                         if not self._ensure_column_materialized(
                             parent,
@@ -267,7 +264,6 @@ class column:
                         ):
                             return None
 
-                    # Ensure parent has the grouping/index map physically available
                     if df.index_header not in parent.columns:
                         if not self._ensure_column_materialized(
                             parent,
@@ -292,6 +288,7 @@ class column:
 
         @merged_col.setter
         def merged_col(df, value):
+            """Set merged col."""
             with self._printer_context(
                 df, f"spreading {self.header} from {df.df_name} into detections"
             ):
@@ -318,6 +315,7 @@ class column:
 
         @property
         def index_col(dets):
+            """Return index col."""
             if self.header in dets.columns:
                 return dets[self.header].to_numpy()
 
@@ -333,6 +331,7 @@ class column:
 
         @index_col.setter
         def index_col(dets, value):
+            """Set index col."""
             if value is None:
                 self._drop_column(dets, self.header)
                 if hasattr(dets, "df_dict"):
@@ -350,6 +349,7 @@ class column:
 
         @property
         def get_df(locs):
+            """Return get df."""
             if self.df_name not in locs.df_dict:
                 if getattr(locs.detections, self.col, None) is None:
                     return None
@@ -368,6 +368,7 @@ class column:
 
         @property
         def len_df(locs):
+            """Return len df."""
             df = getattr(locs, self.df_name)
             return 0 if df is None else len(df)
 
@@ -380,6 +381,7 @@ class column:
 
         @property
         def spread_col(dets):
+            """Return spread col."""
             with self._printer_context(
                 dets, f"spreading {self.col} from {self.df_name} into detections"
             ):
@@ -411,6 +413,7 @@ class column:
 
         @spread_col.setter
         def spread_col(dets, value):
+            """Set spread col."""
             with self._printer_context(
                 dets, f"merging {self.header} from detections into {self.df_name}"
             ):
@@ -449,36 +452,31 @@ class column:
 
         setattr(MainDataFrame, self.col, spread_col)
 
-    # -------------------------------------------------------------------------
     # Descriptor API
-    # -------------------------------------------------------------------------
 
     def __get__(self, instance, cls):
+        """Implement __get__."""
         if instance is None:
             return self
 
-        # Index columns are the dataframe index
         if self.index:
             return instance.index.to_numpy()
 
-        # Already physically present
         if self.header in instance.columns:
             return instance[self.header].to_numpy()
 
-        # Compute lazily
         newcol = self.func(instance)
         if newcol is None:
             return None
 
-        # Alias/substitution
         if isinstance(newcol, str):
             return getattr(instance, newcol)
 
-        # Materialize computed values
         setattr(instance, self.col, newcol)
         return getattr(instance, self.col)
 
     def __set__(self, instance, value):
+        """Implement __set__."""
         if self.index:
             raise SyntaxError(
                 "Setting Dataframe index is not possible, you need to define the index in locs.detections"

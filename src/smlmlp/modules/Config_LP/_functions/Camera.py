@@ -3,20 +3,21 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
 from corelp import prop
 
 
 
-# %% Function
 class Camera :
-    '''
-    Defines camera instance
-    '''
+    """
+    Define camera-level acquisition and optics metadata.
 
-    metadata = [ # (metadata, group)
+    Parameters
+    ----------
+    config : Config
+        Parent configuration object.
+    """
+
+    metadata = [
         ("nchannels", "Cameras"),
         ("npixels", "Cameras"),
         ("bits", "Cameras"),
@@ -25,12 +26,11 @@ class Camera :
         ("experimental_gain", "Detections"),
         ("read_noise", "Detections"),
         ("QE", "Cameras"),
-        ]
+    ]
     properties = ['camera_index', 'gain', "bboxes"]
 
-
-
     def __init__(self, config) :
+        """Initialize the object."""
         self.config = config
 
 
@@ -38,23 +38,28 @@ class Camera :
     # Channels
     @property
     def camera_index(self) :
+        """Return camera index."""
         for i in range(self.config.ncameras) :
             if self.config.cameras[i] is self :
                 return i
 
     @property
     def channels(self) :
+        """Return channels."""
         if not hasattr(self, '_channels') : self.nchannels = 1
         return self._channels
     @property
     def nchannels(self) :
+        """Return nchannels."""
         return len(self.channels)
     @nchannels.setter
     def nchannels(self, value) :
+        """Set nchannels."""
         from smlmlp import Channel
         self._channels = [Channel(self) for _ in range(int(value))]
     @property
     def _nchannels(self) :
+        """Return nchannels."""
         channels = getattr(self, '_channels', None)
         return None if channels is None else len(channels)
 
@@ -64,10 +69,12 @@ class Camera :
 
     @prop(iterable=2, dtype=int)
     def npixels(self) : # (y, x)
+        """Return npixels."""
         return 2304
 
     @prop(iterable=2, dtype=float)
     def pixel_nm(self) : # (y, x) [nm]
+        """Return pixel nm."""
         return 100.
 
 
@@ -76,10 +83,12 @@ class Camera :
 
     @prop(dtype=int)
     def bits(self) :
+        """Return bits."""
         return 16
 
     @property
     def frame_bytes(self) : # gigabytes/frame
+        """Return frame bytes."""
         return self.npixels[0] * self.npixels[1] * self.bits / 8 / 1024**3
     
 
@@ -88,34 +97,41 @@ class Camera :
 
     @property
     def gain(self) :
+        """Return gain."""
         return self.experimental_gain if self.experimental_gain is not None else self.constructor_gain
 
     @prop(dtype=float)
     def constructor_gain(self) : # e-/ADU (Analog to Digital Unit)
+        """Return constructor gain."""
         return 0.25
 
     @prop(dtype=float)
     def experimental_gain(self) : # e-/ADU (Analog to Digital Unit)
+        """Return experimental gain."""
         return None
 
     @prop(dtype=float)
     def read_noise(self) : # ADU (Analog to Digital Unit)
+        """Return read noise."""
         return 0.
 
     @prop(dtype=float)
     def QE(self) : # Quantum Efficiency
-        0.8
+        """Return QE."""
+        return 0.8
     
 
 
     # Bounding box
     @property
     def bboxes(self) :
+        """Return bboxes."""
         FOV = self.config.FOV_max_um
         return self.FOV2bbox(FOV)
 
     @property
     def FOV_max_um(self) : # (y, y) [µm]
+        """Return FOV max um."""
         ny, nx = self.npixels
         match self.nchannels :
             case 1 : # Full frame
@@ -134,6 +150,7 @@ class Camera :
         return int(ny) * self.pixel_nm[0] * 1e-3, int(nx) * self.pixel_nm[1] * 1e-3
 
     def FOV2bbox(self, FOV) : # (x0, y0, x1, y1)
+        """Convert a field of view to per-channel bounding boxes."""
         ny, nx = self.npixels # total number of pixels in frames
         sy, sx = int(FOV[0] * 1e3 / self.pixel_nm[0]), int(FOV[1] * 1e3 / self.pixel_nm[1]) # shape of each channel
         match self.nchannels:
@@ -164,4 +181,3 @@ class Camera :
                         boxes.append((x0, y0, x0 + sx, y0 + sy))
                 return boxes
             case _: raise ValueError("Dividing a camera image into more than 4 channels is not supported.")
-

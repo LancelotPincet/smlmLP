@@ -4,14 +4,12 @@
 # GitHub        : https://github.com/LancelotPincet
 
 
-# %% Libraries
-from smlmlp import analysis
 import numpy as np
 import numba as nb
 from arrlp import nb_threads
+from smlmlp import analysis
 
 
-# %% Function
 @analysis(df_name="points")
 def aggregate_flux(
     intensity_eff,
@@ -22,17 +20,27 @@ def aggregate_flux(
     parallel=False,
 ):
     """
-    Calculate blink flux from localization intensity_eff.
+    Calculate blink flux from localization intensity.
 
-    Rules
-    -----
-    1. If blink has less than 3 frames/localizations -> NaN
-    2. If one blink contains several localizations in same frame -> error
-    3. Else flux = mean intensity_eff excluding first and last frame
+    Parameters
+    ----------
+    intensity_eff : array-like
+        Effective localization intensities.
+    blk : array-like
+        Blink identifiers.
+    fr : array-like
+        Frame identifiers.
+    cuda, parallel : bool, optional
+        Execution options accepted by all analysis functions.
 
-    Also returns a boolean array "switching":
-        True  -> localization is first or last in blink (excluded)
-        False -> localization used in flux
+    Returns
+    -------
+    flux : ndarray
+        Mean middle-frame intensity per blink, with NaN for short blinks.
+    switching : ndarray of bool
+        True for first and last localizations in each blink.
+    info : dict
+        Empty diagnostics dictionary.
     """
 
     blk = np.asarray(blk, dtype=np.uint64)
@@ -41,14 +49,13 @@ def aggregate_flux(
 
     n = len(blk)
 
-    # Sort by blink first, then frame
     order = np.lexsort((fr, blk))
 
     blink_s = blk[order]
     fr_s = fr[order]
     intensity_eff_s = intensity_eff[order]
 
-    unique_blink, start, counts = np.unique(
+    _, start, counts = np.unique(
         blink_s,
         return_index=True,
         return_counts=True,
@@ -64,16 +71,17 @@ def aggregate_flux(
             n,
         )
 
-    # Reorder switching to original order
     switching = np.empty(n, dtype=np.bool_)
     switching[order] = switching_s
 
-    return flux, switching, {}
+    info = {}
+    return flux, switching, info
 
 
 
 @nb.njit(cache=True, parallel=True)
 def _aggregate_flux(blink, fr, intensity_eff, start, counts, n):
+    """Aggregate blink flux and switching flags."""
     n_blinks = len(start)
 
     flux = np.empty(n_blinks, dtype=np.float32)

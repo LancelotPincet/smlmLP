@@ -14,56 +14,86 @@ Locs : This class define objects corresponding to localizations sets for one exp
 
 
 
-# %% Libraries
-from corelp import debug
 import numpy as np
+import pandas as pd
+import pytest
+
 from smlmlp import Locs
-debug_folder = debug(__file__)
 
 
-
-# %% Function test
-def test_function() :
-    '''
-    Test Locs function
-    '''
-    
-    # Init
+def test_locs_reuses_existing_instance() :
+    """Passing a Locs instance returns the same object."""
     locs = Locs()
 
-    # Simulate random data
-    argunsort = np.arange(10000)
-    np.random.shuffle(argunsort)
-    array = np.hstack([np.full(100, i) for i in range(1, 101)]) # Stack of constants to apply to xdet and fr (should be paired)
-    x_det = array.astype(np.float32)[argunsort]
-    fr = array.astype(np.uint32)[argunsort]
-
-    # Set data in locs object
-    locs.detections.fr = fr
-    locs.detections.x_det = x_det
-    assert (locs.detections.x_det == x_det).all()
-    assert (locs.detections.fr == fr).all()
-
-    # Looking at frames dataframe with merging and spreads
-    x_det_frames = locs.frames.x_det # merging
-    assert (locs.frames.fr == x_det_frames).all()
-    locs.frames.dx = x_det_frames # spreading
-    assert (locs.detections.dx == x_det).all()
-
-    # Saving and loading
-    path = debug_folder / 'locs'
-    locs.save(path)
-    locs2 = Locs(path)
-
-    # Filter
-    from rootlp import printer
-    locs.printer = printer
-    mask = locs.detections.x_det > 50
-    locs3 = locs.filter(mask=mask)
-    
+    assert Locs(locs) is locs
 
 
-# %% Test function run
+def test_locs_times_aliases_time_cache() :
+    """The analysis decorator timing alias points to the Locs time cache."""
+    locs = Locs()
+
+    locs.times["step"] = 1.5
+
+    assert locs.time["step"] == 1.5
+
+
+def test_locs_opens_dataframe_and_assigns_columns() :
+    """A dataframe source populates the detections dataframe."""
+    source = pd.DataFrame(
+        {
+            "frame": [1, 1, 2],
+            "x detection [nm]": [10.0, 20.0, 30.0],
+            "y detection [nm]": [15.0, 25.0, 35.0],
+        }
+    )
+
+    locs = Locs(source)
+
+    np.testing.assert_array_equal(locs.detections.fr, np.array([1, 1, 2], dtype=np.uint32))
+    np.testing.assert_allclose(locs.detections.x_det, [10.0, 20.0, 30.0])
+    assert locs.ndetections == 3
+
+
+def test_locs_open_skips_unknown_columns_with_warning() :
+    """Unknown dataframe headers are warned about and ignored."""
+    source = pd.DataFrame({"frame": [1], "unknown": [99]})
+
+    with pytest.warns(UserWarning, match="Skipping opening unknown column") :
+        locs = Locs(source)
+
+    assert locs.ndetections == 1
+    assert "unknown" not in locs.detections.columns
+
+
+def test_locs_filter_returns_filtered_locs() :
+    """Filtering keeps matching detections and removes the temporary filter column."""
+    locs = Locs()
+    locs.detections.fr = np.array([1, 1, 2], dtype=np.uint32)
+    locs.detections.x_det = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+
+    filtered = locs.filter(mask=locs.detections.x_det > 15)
+
+    np.testing.assert_allclose(filtered.detections.x_det, [20.0, 30.0])
+    assert "filter" not in filtered.detections.columns
+
+
+def test_locs_combine_adds_channel_labels() :
+    """Combining localization sets concatenates detections and labels sources."""
+    first = Locs()
+    first.detections.fr = np.array([1], dtype=np.uint32)
+    first.detections.x_det = np.array([10.0], dtype=np.float32)
+
+    second = Locs()
+    second.detections.fr = np.array([2, 3], dtype=np.uint32)
+    second.detections.x_det = np.array([20.0, 30.0], dtype=np.float32)
+
+    combined = first.combine(second)
+
+    assert combined.ndetections == 3
+    np.testing.assert_array_equal(combined.detections.ch, [1, 2, 2])
+
+
 if __name__ == "__main__":
     from corelp import test
+
     test(__file__)

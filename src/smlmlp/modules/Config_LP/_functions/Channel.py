@@ -3,24 +3,22 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
-from corelp import prop
-from smlmlp import Camera
 import numpy as np
 from arrlp import coordinates, transform_matrix
+from corelp import prop
+from smlmlp import Camera
 
-
-
-
-# %% Function
 class Channel :
-    '''
-    Defines channel instance
-    '''
+    """
+    Define channel-level optical and registration metadata.
 
-    metadata = [ # (metadata, group)
+    Parameters
+    ----------
+    camera : Camera
+        Parent camera object.
+    """
+
+    metadata = [
         ("flip", "Cameras"),
         ("psf_xsigma_nm", "Blinks"),
         ("psf_ysigma_nm", "Blinks"),
@@ -34,16 +32,18 @@ class Channel :
         ("x_shear", "Registration"),
         ("y_shear", "Registration"),
         ("wf_image", "Data"),
-        ]
+    ]
     properties = ["channel_index", "psf_sigma_nm", "psf_radius_nm", "psf_diameter_nm", "psf_fwhm_nm", "spatial_kernel", "spatial_kernel_shape", "psf_kernel", "default_crop_nm", "crop_pix", "image_transform_matrix", "locs_transform_matrix"]
 
 
 
     def __init__(self, camera) :
+        """Initialize the object."""
         self.camera = camera
 
     @property
     def channel_index(self) :
+        """Return channel index."""
         for i in range(self.camera.nchannels) :
             if self.camera.channels[i] is self :
                 return i
@@ -54,10 +54,12 @@ class Channel :
 
     @prop(iterable=2, dtype=bool)
     def bbox(self) :
+        """Return bbox."""
         return self.bboxes[self.channel_index]
 
     @prop(iterable=2, dtype=bool)
     def flip(self) :
+        """Return flip."""
         return False
 
 
@@ -66,56 +68,73 @@ class Channel :
 
     @prop()
     def psf_xtangents(self) : # spline
+        """Return psf xtangents."""
         return None
     @prop()
     def psf_ytangents(self) : # spline
+        """Return psf ytangents."""
         return None
     @prop()
     def psf_spline_coeffs(self) : # spline
+        """Return psf spline coeffs."""
         return None
 
     @prop()
     def psf_xsigma_nm(self) : # [nm]
+        """Return psf xsigma nm."""
         return 0.21 * 670 / 1.5
     @prop()
     def psf_ysigma_nm(self) : # [nm]
+        """Return psf ysigma nm."""
         return 0.21 * 670 / 1.5
     @prop()
     def psf_theta_deg(self) : # [°]
+        """Return psf theta deg."""
         return 0.
     @prop()
     def channels_fit_theta(self) : # [°]
+        """Return channels fit theta."""
         return 0.
 
     @property
     def psf_sigma_nm(self) : # [nm]
+        """Return psf sigma nm."""
         return np.sqrt(self.psf_xsigma_nm * self.psf_ysigma_nm)
     @psf_sigma_nm.setter
     def psf_sigma_nm(self, value) :
+        """Set psf sigma nm."""
         self.psf_xsigma_nm, self.psf_ysigma_nm = value, value
     @property
     def psf_wl_na_nm(self) : # [nm]
-        return self.sigma_nm / 0.21
+        """Return psf wl na nm."""
+        return self.psf_sigma_nm / 0.21
     @psf_wl_na_nm.setter
     def psf_wl_na_nm(self, value) :
+        """Set psf wl na nm."""
         self.psf_sigma_nm = 0.21 * value
     @property
     def psf_radius_nm(self) : # nm
+        """Return psf radius nm."""
         return 0.61 * self.psf_wl_na_nm
     @psf_radius_nm.setter
     def psf_radius_nm(self, value) :
+        """Set psf radius nm."""
         self.psf_wl_na_nm = value / 0.61
     @property
     def psf_diameter_nm(self) : # nm
+        """Return psf diameter nm."""
         return 1.22 * self.psf_wl_na_nm
     @psf_diameter_nm.setter
     def psf_diameter_nm(self, value) :
+        """Set psf diameter nm."""
         self.psf_wl_na_nm = value / 1.22
     @property
     def psf_fwhm_nm(self) : # nm
+        """Return psf fwhm nm."""
         return 0.51 * self.psf_wl_na_nm
     @psf_fwhm_nm.setter
     def psf_fwhm_nm(self, value) :
+        """Set psf fwhm nm."""
         self.psf_wl_na_nm = value / 0.51
 
 
@@ -124,11 +143,13 @@ class Channel :
 
     @property
     def mean_radius_pix(self) :
+        """Return mean radius pix."""
         rad_nm = self.camera.config.mean_radius_nm
         return rad_nm / self.pixel_nm[0], rad_nm / self.pixel_nm[1]
 
     @property
     def opening_radius_pix(self) :
+        """Return opening radius pix."""
         rad_nm = self.camera.config.opening_radius_nm
         return rad_nm / self.pixel_nm[0], rad_nm / self.pixel_nm[1]
 
@@ -138,10 +159,12 @@ class Channel :
 
     @property
     def spatial_subtract_factor(self) :
+        """Return spatial subtract factor."""
         return self.camera.config.spatial_subtract_factor
 
     @property
     def spatial_kernel_shape(self) :
+        """Return spatial kernel shape."""
         sigma_pix = max(self.psf_xsigma_nm, self.psf_ysigma_nm) / min(self.pixel_nm)
         if self.spatial_subtract_factor > 1 : sigma_pix *= self.spatial_subtract_factor
         sigma_pix = int(np.ceil(sigma_pix))
@@ -149,6 +172,7 @@ class Channel :
 
     @property
     def psf_kernel(self) :
+        """Return the normalized PSF kernel for this channel."""
         Y, X = coordinates(shape=self.spatial_kernel_shape, pixel=self.pixel_nm, grid=False)
         if self.psf_xtangents is not None and self.psf_ytangents is not None and self.psf_spline_coeffs is not None :
             from funclp import Spline2D
@@ -165,6 +189,7 @@ class Channel :
 
     @property
     def spatial_subtract_kernel(self) :
+        """Return the normalized spatial subtraction kernel, if enabled."""
         if self.spatial_subtract_factor <= 1 : return None
         pixel = self.pixel_nm[0] / self.spatial_subtract_factor, self.pixel_nm[1] / self.spatial_subtract_factor
         Y, X = coordinates(shape=self.spatial_kernel_shape, pixel=pixel, grid=False)
@@ -183,6 +208,7 @@ class Channel :
 
     @prop(cache=True)
     def spatial_kernel(self) :
+        """Return the effective spatial filtering kernel."""
         if self.spatial_subtract_factor <= 1 :
             return self.psf_kernel
         k = self.psf_kernel - self.spatial_subtract_kernel
@@ -194,12 +220,14 @@ class Channel :
 
     @property
     def default_crop_nm(self) : # nm
+        """Return default crop nm."""
         h = self.psf_ysigma_nm / self.pixel_nm[0] * 8
         w = self.psf_xsigma_nm / self.pixel_nm[1] * 8
         return int(2*(h//2)+1) * self.pixel_nm[0], int(2*(w//2)+1) * self.pixel_nm[1]
 
     @property
     def crop_pix(self) : # pixel
+        """Return crop pix."""
         crop_nm = self.camera.config.crop_nm
         h = crop_nm / self.pixel_nm[0]
         w = crop_nm / self.pixel_nm[1]
@@ -211,25 +239,32 @@ class Channel :
 
     @prop()
     def x_shift_nm(self) : # nm
+        """Return x shift nm."""
         return 0.
     @prop()
     def y_shift_nm(self) : # nm
+        """Return y shift nm."""
         return 0.
     @prop()
     def rotation_deg(self) : # deg
+        """Return rotation deg."""
         return 0.
     @prop()
     def x_shear(self) :
+        """Return x shear."""
         return 0.
     @prop()
     def y_shear(self) :
+        """Return y shear."""
         return 0.
     @prop()
     def image_transform_matrix(self) :
+        """Return image transform matrix."""
         shape = self.bbox[3]-self.bbox[1], self.bbox[2]-self.bbox[0]
         return transform_matrix(shape=shape, shiftx=self.x_shift_nm/self.pixel_nm[1], shifty=self.y_shift_nm/self.pixel_nm[0], shearx=self.x_shear, sheary=self.y_shear, angle=self.rotation_deg)
     @prop()
     def locs_transform_matrix(self) :
+        """Return locs transform matrix."""
         shape = (self.bbox[3]-self.bbox[1]) * self.pixel_nm[0], (self.bbox[2]-self.bbox[0]) * self.pixel_nm[1]
         return transform_matrix(shape=shape, shiftx=self.x_shift_nm, shifty=self.y_shift_nm, shearx=self.x_shear, sheary=self.y_shear, angle=self.rotation_deg)
 
@@ -239,6 +274,7 @@ class Channel :
 
     @prop()
     def wf_image(self) : # 2D image
+        """Return wf image."""
         if self.locs is not None :
             from smlmlp import image_pixel
             return image_pixel(self.locs.intensity, self.psf_sigma_nm, locs=self.locs)[0]
@@ -248,12 +284,12 @@ class Channel :
 for data, _ in Camera.metadata :
     @property
     def camera_property(self, data=data) :
+        """Return camera property."""
         return getattr(self.camera, data)
     setattr(Channel, data, camera_property)
 for data in Camera.properties :
     @property
     def camera_property(self, data=data) :
+        """Return camera property."""
         return getattr(self.camera, data)
     setattr(Channel, data, camera_property)
-
-

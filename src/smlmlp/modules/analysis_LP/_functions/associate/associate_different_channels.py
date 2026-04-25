@@ -4,17 +4,16 @@
 # GitHub        : https://github.com/LancelotPincet
 
 
-# %% Libraries
-from smlmlp import analysis
+import os
+
+from joblib import Parallel, delayed
 import numpy as np
 from scipy.spatial import cKDTree
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
-from joblib import Parallel, delayed
-import os
+from smlmlp import analysis
 
 
-# %% Function
 @analysis(df_name="detections")
 def associate_different_channels(
     x,
@@ -27,21 +26,20 @@ def associate_different_channels(
     parallel=False,
 ):
     """
-    Associate localizations from different channels in the same frame.
+    Associate same-frame localizations from different channels.
 
-    Workflow
-    --------
-    1. Work frame by frame
-    2. Build spatial candidate graph with KDTree
-    3. Keep only cross-channel edges
-    4. Split into connected components
-    5. For each component:
-        - if missing one required channel -> reject
-        - generate valid groups with one localization per required channel
-        - prune impossible groups early using association_radius_nm
-        - score groups by centroid variance
-        - greedily keep best non-overlapping groups
-    6. Leftover localizations receive point index 0
+    Parameters
+    ----------
+    x, y : array-like
+        Localization coordinates.
+    fr : array-like
+        Frame identifiers.
+    ch : array-like
+        Channel identifiers.
+    association_radius_nm : float, optional
+        Maximum spatial association radius.
+    cuda, parallel : bool or int, optional
+        Execution options accepted by all analysis functions.
 
     Returns
     -------
@@ -53,9 +51,6 @@ def associate_different_channels(
         Diagnostics.
     """
 
-    # --------------------------------------------------------------
-    # Normalize parallel argument
-    # --------------------------------------------------------------
     if parallel is False or parallel == 1:
         n_jobs = 1
     elif parallel is True or parallel == -1:
@@ -65,9 +60,6 @@ def associate_different_channels(
     else:
         raise ValueError("Invalid value for 'parallel'")
 
-    # --------------------------------------------------------------
-    # Input conversion
-    # --------------------------------------------------------------
     x = np.asarray(x, dtype=np.float32)
     y = np.asarray(y, dtype=np.float32)
     fr = np.asarray(fr, dtype=np.uint32)
@@ -79,14 +71,16 @@ def associate_different_channels(
     n = len(fr)
 
     if n == 0:
-        return np.empty(0, dtype=np.uint64), {}
+        info = {
+            "n_ambiguous_components": 0,
+            "n_groups": 0,
+            "max_component_size": 0,
+        }
+        return np.empty(0, dtype=np.uint64), info
 
     radius = float(association_radius_nm)
     radius2 = radius * radius
 
-    # --------------------------------------------------------------
-    # Sort by frame
-    # --------------------------------------------------------------
     order = np.argsort(fr, kind="stable")
 
     xs = x[order]
@@ -100,10 +94,8 @@ def associate_different_channels(
         return_counts=True,
     )
 
-    # --------------------------------------------------------------
-    # Worker function
-    # --------------------------------------------------------------
     def _associate_one_frame(k):
+        """Associate localizations within one frame."""
 
         a0 = start[k]
         a1 = a0 + counts[k]
@@ -131,18 +123,12 @@ def associate_different_channels(
 
         pts = np.column_stack((xf, yf))
 
-        # ----------------------------------------------------------
-        # KDTree: all close pairs within the same frame
-        # ----------------------------------------------------------
         tree = cKDTree(pts)
         pairs = tree.query_pairs(radius, output_type="ndarray")
 
         if len(pairs) == 0:
             return point_local, stats
 
-        # ----------------------------------------------------------
-        # Keep only pairs from different channels
-        # ----------------------------------------------------------
         keep = cf[pairs[:, 0]] != cf[pairs[:, 1]]
         pairs = pairs[keep]
 
@@ -151,9 +137,6 @@ def associate_different_channels(
 
         stats["n_candidate_edges"] = len(pairs)
 
-        # ----------------------------------------------------------
-        # Connected components of candidate graph
-        # ----------------------------------------------------------
         graph = coo_matrix(
             (
                 np.ones(len(pairs) * 2, dtype=np.uint8),
@@ -219,9 +202,6 @@ def associate_different_channels(
 
         return point_local, stats
 
-    # --------------------------------------------------------------
-    # Run frame workers
-    # --------------------------------------------------------------
     if n_jobs == 1:
         per_frame = [_associate_one_frame(k) for k in range(len(unique))]
     else:
@@ -230,9 +210,6 @@ def associate_different_channels(
             for k in range(len(unique))
         )
 
-    # --------------------------------------------------------------
-    # Merge local point indices into global point indices
-    # --------------------------------------------------------------
     point_sorted = np.zeros(n, dtype=np.int64)
 
     offset = 0
@@ -255,15 +232,9 @@ def associate_different_channels(
         if point_local.max() > 0:
             offset += point_local.max()
 
-    # --------------------------------------------------------------
-    # Restore original order
-    # --------------------------------------------------------------
     point = np.zeros_like(point_sorted)
     point[order] = point_sorted
 
-    # --------------------------------------------------------------
-    # Diagnostics
-    # --------------------------------------------------------------
     info = {
         "n_ambiguous_components": int(sum(s["n_ambiguous_components"] for s in stats_all)),
         "n_groups": int(sum(s["n_groups"] for s in stats_all)),
@@ -273,7 +244,6 @@ def associate_different_channels(
     return point.astype(np.uint64), info
 
 
-# %% Component solver
 def _solve_multichannel_component(
     x,
     y,
@@ -281,25 +251,10 @@ def _solve_multichannel_component(
     required_channels,
     radius2,
 ):
-    """
-    Solve one connected component.
-
-    Returns
-    -------
-    groups : ndarray, shape (n_groups, n_required_channels)
-        Local component indices.
-
-    status : int
-        0 = missing required channel
-        1 = simple / non-ambiguous
-        2 = ambiguous component
-    """
+    """Solve one multichannel connected component."""
 
     n_required = len(required_channels)
 
-    # --------------------------------------------------------------
-    # Collect candidate indices per required channel
-    # --------------------------------------------------------------
     channel_indices = []
 
     ambiguous = False
@@ -315,15 +270,13 @@ def _solve_multichannel_component(
 
         channel_indices.append(idx)
 
-    # --------------------------------------------------------------
-    # Generate all valid complete groups with pruning
-    # --------------------------------------------------------------
     groups = []
     costs = []
 
     current = np.empty(n_required, dtype=np.int64)
 
     def build(level):
+        """Build valid groups recursively."""
 
         if level == n_required:
 
@@ -350,11 +303,6 @@ def _solve_multichannel_component(
 
         for candidate in channel_indices[level]:
 
-            # ------------------------------------------------------
-            # Pruning:
-            # reject candidate immediately if it is too far from
-            # any already-selected localization.
-            # ------------------------------------------------------
             valid = True
 
             for prev_level in range(level):
@@ -381,17 +329,9 @@ def _solve_multichannel_component(
     groups = np.asarray(groups, dtype=np.int64)
     costs = np.asarray(costs, dtype=np.float64)
 
-    # --------------------------------------------------------------
-    # Perfect simple case:
-    # exactly one localization per channel
-    # --------------------------------------------------------------
     if not ambiguous:
         return groups[:1], 1
 
-    # --------------------------------------------------------------
-    # Ambiguous case:
-    # greedily select lowest-cost non-overlapping groups
-    # --------------------------------------------------------------
     order = np.argsort(costs)
 
     used = np.zeros(len(x), dtype=bool)

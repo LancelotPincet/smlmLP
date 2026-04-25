@@ -5,18 +5,17 @@
 
 
 
-# %% Libraries
 from smlmlp import analysis
-import numpy as np
-import numba as nb
 
 
-
-# %% Function
 @analysis(df_name="pixels")
 def image_colmap(col, /, pix, *, cuda=False, parallel=False) :
-    '''
-    TODO.
-    '''
-    raise SyntaxeError('Not implemented')
-    None, {}
+    """
+    Placeholder for image colmap.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this analysis is not implemented yet.
+    """
+    raise SyntaxError("Not implemented yet.")

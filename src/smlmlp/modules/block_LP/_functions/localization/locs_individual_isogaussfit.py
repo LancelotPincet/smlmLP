@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from funclp import LM, MLE, LSE, Poisson, Normal, IsoGaussian
 from arrlp import get_xp, nb_threads, coordinates
@@ -15,7 +14,6 @@ SIGMA = 0.21 * 670 / 1.5
 
 
 
-# %% Function
 @block()
 def locs_individual_isogaussfit(
     crops,
@@ -70,13 +68,13 @@ def locs_individual_isogaussfit(
     Returns
     -------
     tuple
-        A tuple ``(mux, muy, output)`` where:
+        A tuple ``(mux, muy, info)`` where:
 
         - ``mux`` is the concatenated x localization array in nanometers,
         - ``muy`` is the concatenated y localization array in nanometers,
-        - ``output`` is a dictionary with fitted parameter arrays.
+        - ``info`` is a dictionary with fitted parameter arrays.
 
-        ``output`` contains:
+        ``info`` contains:
 
         ``'amp'``
             Concatenated converted amplitudes.
@@ -91,7 +89,7 @@ def locs_individual_isogaussfit(
     >>> crops = [np.random.rand(2, 7, 7).astype(np.float32)]
     >>> x0 = [np.array([10, 20], dtype=np.float32)]
     >>> y0 = [np.array([30, 40], dtype=np.float32)]
-    >>> mux, muy, output = locs_individual_isogaussfit(
+    >>> mux, muy, info = locs_individual_isogaussfit(
     ...     crops,
     ...     x0,
     ...     y0,
@@ -100,17 +98,17 @@ def locs_individual_isogaussfit(
     ... )
     >>> mux.shape == muy.shape
     True
-    >>> sorted(output)
+    >>> sorted(info)
     ['amp', 'offset', 'sigma']
 
-    >>> mux, muy, output = locs_individual_isogaussfit(
+    >>> mux, muy, info = locs_individual_isogaussfit(
     ...     crops,
     ...     x0,
     ...     y0,
     ...     channels_pixels_nm=[(100.0, 120.0)],
     ...     channels_psf_sigmas_nm=[80.0],
     ... )
-    >>> output['sigma'].ndim
+    >>> info['sigma'].ndim
     1
     """
     n_channels = len(crops)
@@ -206,13 +204,13 @@ def locs_individual_isogaussfit(
             sig = xp.asnumpy(sig)
         sigma_all.append(sig)
 
-    output = {
+    info = {
         "amp": np.hstack(amp_all),
         "offset": np.hstack(offset_all),
         "sigma": np.hstack(sigma_all),
     }
 
-    return np.hstack(mux_all), np.hstack(muy_all), output
+    return np.hstack(mux_all), np.hstack(muy_all), info
 
 
 

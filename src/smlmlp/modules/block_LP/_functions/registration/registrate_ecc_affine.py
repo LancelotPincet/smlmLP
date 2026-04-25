@@ -3,16 +3,10 @@
 # Author        : Lancelot PINCET
 # GitHub        : https://github.com/LancelotPincet
 
-
-
-# %% Libraries
 from smlmlp import block
-from arrlp import img_crosscorr, get_xp
-import numpy as np
 
 
 
-# %% Function
 @block()
 def registrate_ecc_shift(
     optimized,
@@ -22,8 +16,27 @@ def registrate_ecc_shift(
     cuda=False,
     parallel=False,
 ):
-    """
-    Estimate redundant pairwise shifts from enhanced correlation coefficient images.
+    """Estimate affine registration from enhanced correlation coefficient images.
 
+    Parameters
+    ----------
+    optimized : sequence of ndarray
+        Sequence of optimized registration images.
+    ref_pix : float or tuple of float, optional
+        Reference pixel size used to convert fitted parameters.
+    cuda : bool, optional
+        Whether to use CUDA execution.
+    parallel : bool, optional
+        Whether to use parallel execution.
+
+    Returns
+    -------
+    tuple
+        A tuple whose last item is an ``info`` dictionary.
+
+    Raises
+    ------
+    SyntaxError
+        Always raised because this block is not implemented.
     """
-    return TODO
+    raise SyntaxError("Not implemented yet.")

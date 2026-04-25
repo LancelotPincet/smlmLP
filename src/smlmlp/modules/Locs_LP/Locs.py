@@ -10,50 +10,51 @@
 This class define objects corresponding to localizations sets for one experiment.
 """
 
-
-
-# %% Libraries
-from corelp import folder, selfkwargs, prop
-from smlmlp import open_df, save_df, LocsReceiver, DetsDataFrame, Config, columns
-from pathlib import Path
-import pandas as pd
-import numpy as np
 from contextlib import nullcontext
-import importlib
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from corelp import folder, prop, selfkwargs
+from smlmlp import Config, DetsDataFrame, LocsReceiver, columns, open_df, save_df
 
 
 
-# %% Class
 class Locs(LocsReceiver) :
-    '''
-    This class define objects corresponding to localizations sets for one experiment.
+    """
+    Store localization dataframes and metadata for one experiment.
 
     Parameters
     ----------
-    a : int or float
-        TODO.
+    source : Locs, pandas.DataFrame, path-like, list[pandas.DataFrame], or None, default=None
+        Localization source to open.
+    config : Config, path-like, dict, or None, default=None
+        Configuration source passed to Config.
+    **kwargs
+        Additional attributes assigned on the instance.
 
     Attributes
     ----------
-    _attr : int or float
-        TODO.
+    df_dict : dict
+        Mapping of dataframe names to dataframe instances.
+    config : Config
+        Configuration attached to this localization set.
 
     Examples
     --------
     >>> from smlmlp import Locs
-    ...
-    >>> instance = Locs(TODO)
-    '''
+    >>> instance = Locs()
+    """
 
 
     # Creates Locs objects
     def __new__(cls, source=None, config=None, **kwargs) :
 
-        #If Locs object is given as input returns it directly
+        """Create or reuse an instance."""
         if isinstance(source, cls) :
             return source
 
-        #Creates a new Locs object
         return object.__new__(cls)
 
 
@@ -61,14 +62,13 @@ class Locs(LocsReceiver) :
     # Initialize with any object
     df_dict = None
     def __init__(self, source=None, config=None, **kwargs) :
+        """Initialize the object."""
         self.df_dict = dict(detections=DetsDataFrame(self))
         selfkwargs(self, kwargs)
 
-        #Changes attributes from kwargs values
         if isinstance(source, Locs) :
-            return #break if already a Locs object
+            return
 
-        #Opening data
         if source is not None :
             self.open(source)
 
@@ -84,14 +84,17 @@ class Locs(LocsReceiver) :
     # Config
     @prop()
     def config_source(self) :
+        """Return config source."""
         return None
     @config_source.setter
     def config_source(self, value) :
+        """Set config source."""
         if getattr(self, '_config_source', None) is not None :
             raise ValueError('Config source is defined twice')
         self._config_source = value
     @property
     def config_kwargs(self) :
+        """Return config kwargs."""
         return dict(ncameras=1) if self.config_source is None else dict()
 
 
@@ -99,9 +102,11 @@ class Locs(LocsReceiver) :
     # Detections properties
     @property
     def detections(self) :
+        """Return detections."""
         return self.df_dict['detections']
     @property
     def ndetections(self) :
+        """Return ndetections."""
         return len(self.detections)
 
 
@@ -109,13 +114,19 @@ class Locs(LocsReceiver) :
     # Analysis
     @prop(cache=True)
     def time(self) :
+        """Return time."""
         return {}
+    @property
+    def times(self) :
+        """Alias timing storage used by analysis decorators."""
+        return self.time
     printer = None # rootlp printing
 
 
 
     # Opening
     def open(self, source) :
+        """Open localization data from a supported source."""
         if source is None :
             return
         elif isinstance(source, pd.DataFrame) :
@@ -171,6 +182,7 @@ class Locs(LocsReceiver) :
 
     # Saving
     def save(self, path, file=None) :
+        """Save localization dataframes and metadata to a folder."""
         path = Path(path) if file is None else Path(path) / file
         saving_folder = folder(path.with_suffix(''), warning=False)
         stem = saving_folder.stem
@@ -190,6 +202,7 @@ class Locs(LocsReceiver) :
 
     # Filter
     def filter(self, *filter_names, mask=None, df_name="detections") :
+        """Return a new Locs object containing rows matching all filters."""
         base_df = self.df_dict[df_name]
         filters = [getattr(base_df, name, None) for name in filter_names]
         if mask is not None : filters += [mask]
@@ -204,6 +217,7 @@ class Locs(LocsReceiver) :
 
     # Split
     def split(self, nlocs=2) :
+        """Split localizations by frame modulo ``nlocs``."""
         locs_list = []
         for i in range(nlocs) :
             mask = self.blinks.fr % nlocs == i
@@ -215,10 +229,11 @@ class Locs(LocsReceiver) :
 
     # Combine
     def combine(self, *locs_list, col_name="ch") :
+        """Combine this Locs object with others and label their source."""
         locs_list = [self] + list(locs_list)
         detections = pd.concat([locs.detections for locs in locs_list], ignore_index=True)
         newlocs = Locs(detections, config=self.config, printer=self.printer)
-        newcol = np.hstacks([np.full(locs.ndetections, fill_value=i+1, dtype=np.uint8) for i, locs in enumerate(locs_list)])
+        newcol = np.hstack([np.full(locs.ndetections, fill_value=i+1, dtype=np.uint8) for i, locs in enumerate(locs_list)])
         setattr(newlocs.detections, col_name, newcol)
         return newlocs
 
@@ -226,13 +241,12 @@ class Locs(LocsReceiver) :
 
     # Crop
     def crop(self, xmin, ymin, xmax, ymax) :
+        """Crop detections to an inclusive xy rectangle."""
         x, y = self.detections.x, self.detections.y
         mask = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
         return self.filter(mask=mask)
 
-
-
-# %% Test function run
 if __name__ == "__main__":
     from corelp import test
+
     test(__file__)

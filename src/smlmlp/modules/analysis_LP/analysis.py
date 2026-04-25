@@ -12,46 +12,39 @@ This function is a decorator to be used on block function, which allow to use co
 
 
 
-# %% Libraries
 import functools
-import time
 import inspect
+import time
 from contextlib import nullcontext
+
 from smlmlp import metadatum
 
-
-
-# %% Function
 def analysis(timeit=True, df_name='detections') :
-    '''
+    """
     This function is a decorator to be used on block function, which allow to use config for default values.
-    A decorated function can use a config object with config=config_object to defined default value of all the keyword only parameters.
-    You can also use a Locs object via the locs=mylocsobject attribute for all parameters linked to localizations
-    This decorator works for functions and generators.
-    Computation time will be added for each call of the decorated function in block.times dictionary.
-    
+
+    Decorate an analysis function so it can read values from a Locs object.
+
+    Parameters
+    ----------
+    timeit : bool, optional
+        Whether to record execution time when a Locs object is provided.
+    df_name : str, optional
+        Name of the Locs dataframe used to fill function arguments.
+
     Returns
     -------
-    function : function
-        Decorated function.
-
-    Examples
-    --------
-    >>> from smlmlp import block
-    ...
-    >>> block()
-    ... def myfunc() :
-    ...     return long_process()
-    ...
-    >>> result = myfunc(config=config_object)
-    '''
+    function
+        Decorator for an analysis function.
+    """
 
     def decorator(function) :
+        """Create the decorated callable."""
         name = function.__name__
         @functools.wraps(function)
-        def wrapper(*args, locs=None, df_name=df_name, **kwargs) -> None :
+        def wrapper(*args, locs=None, df_name=df_name, **kwargs) :
+            """Call the wrapped function with normalized arguments."""
 
-            # Manages kwargs from config and df
             kwargs = {key: value for key, value in kwargs.items() if value is not None}
             if locs is not None :
                 config = locs.config
@@ -75,13 +68,11 @@ def analysis(timeit=True, df_name='detections') :
             else :
                 timeit = nullcontext()
 
-            #Launch timed function
             with timeit :
                 tic = time.perf_counter()
                 result = function(*args, **kwargs)
                 toc = time.perf_counter()
 
-            # Check if generator, if normal function just exit here
             if not inspect.isgenerator(result):
                 if timeit and locs is not None :
                     if name in locs.times :
@@ -90,8 +81,8 @@ def analysis(timeit=True, df_name='detections') :
                         locs.times[name] = toc-tic
                 return result
             
-            # If is a generator
             def generator_wrapper():
+                """Record execution time for generator steps."""
                 while True:
                     try:
                         tic = time.perf_counter()

@@ -5,7 +5,6 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import get_xp, sortloop
 import bottleneck as bn
@@ -14,7 +13,6 @@ from scipy.stats import linregress
 
 
 
-# %% Function
 @block()
 def detect_gain(channels, /, nbins=50, *, cuda=False, parallel=False):
     """

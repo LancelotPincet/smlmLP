@@ -5,8 +5,7 @@
 
 
 
-# %% Libraries
-from smlmlp import block, Config
+from smlmlp import block
 from arrlp import gc, get_xp, img_gaussianfilter
 from funclp import Exponential1
 from stacklp import temporal_autocorr as stack_autocorr
@@ -15,7 +14,6 @@ from scipy.optimize import curve_fit
 
 
 
-# %% Function
 @block(timeit=False)
 def blink_temporal_on(
     channels,
@@ -47,8 +45,7 @@ def blink_temporal_on(
         have shape ``(n_frames, height, width)``.
     crop_fr : int or None, optional
         Number of temporal lags to keep from the autocorrelation. If ``None``,
-        it is set to ``int(len(channels) // 2 - 1)`` following the original
-        implementation.
+        it is set to half of the first channel frame count minus one.
     psf_sigma_nm : float or sequence, optional
         PSF sigma in nanometers, one value per channel or a scalar shared
         across channels. This value is used to define the Gaussian smoothing
@@ -152,7 +149,13 @@ def blink_temporal_on(
 
     # Build the temporal lag coordinates used for averaging and fitting.
     if crop_fr is None:
-        crop_fr = int(len(channels) // 2 - 1)
+        crop_fr = int(channels[0].shape[0] // 2 - 1)
+
+    try:
+        if len(psf_sigma_nm) != len(channels):
+            raise ValueError("psf_sigma_nm does not have the same length as channels")
+    except TypeError:
+        psf_sigma_nm = [psf_sigma_nm for _ in range(len(channels))]
 
     T = np.arange(crop_fr)
     t = T * exposure_ms

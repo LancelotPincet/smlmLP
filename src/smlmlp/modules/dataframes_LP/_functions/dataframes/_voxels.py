@@ -5,21 +5,19 @@
 
 
 
-# %% Libraries
-from smlmlp import DataFrame, column
 import numpy as np
 
+from smlmlp import DataFrame, column
 
 
-# %% Function
 class voxels(DataFrame) :
-    '''
-    Voxels dataframe
-    '''
+    """Voxel-level dataframe aggregated from points."""
 
     @column(headers=['voxel'], dtype=np.uint64, save=True, agg='min', index="points")
     def vox(self) :
+        """Assign voxel identifiers."""
         from smlmlp import index_voxels
+
         return index_voxels(locs=self.locs)[0]
 
 
@@ -28,5 +26,7 @@ class voxels(DataFrame) :
 
     @column(headers=['density [loc.um-2]'], dtype=np.float32, save=True, agg='mean')
     def density(self) :
+        """Estimate local density for each voxel."""
         from smlmlp import neighbors_density
+
         return neighbors_density(locs=self.locs)[0]

@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from stacklp import temporal_correlate
 import numpy as np
 
 
 
-# %% Function
 @block()
 def signal_temporal_filter(
     channels,

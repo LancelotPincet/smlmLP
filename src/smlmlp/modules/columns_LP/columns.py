@@ -10,17 +10,21 @@
 This is a dict of all the columns that are created.
 """
 
-
-
+# %% Class
 class Columns(dict) :
+    """This is a dict of all the columns that are created."""
+
     def __init__(self, *args, **kwargs) :
+        """Initialize the object."""
         super().__init__(*args, **kwargs)
-        self.headers = {} # header: column object
-        self.head2save = [] # headers to save
+        self.headers = {}
+        self.head2save = []
+
+
 columns = Columns()
 
 
-# %% Test function run
 if __name__ == "__main__":
     from corelp import test
+
     test(__file__)

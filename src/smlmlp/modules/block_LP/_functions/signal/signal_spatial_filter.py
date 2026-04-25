@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import img_correlate
 import numpy as np
 
 
 
-# %% Function
 @block()
 def signal_spatial_filter(
     channels,

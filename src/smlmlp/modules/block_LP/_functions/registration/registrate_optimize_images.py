@@ -5,14 +5,12 @@
 
 
 
-# %% Libraries
 from smlmlp import block
 from arrlp import img_transform, get_xp, transform_matrix, compress
 import numpy as np
 
 
 
-# %% Function
 @block(timeit=False)
 def registrate_optimize_images(
     channels,
@@ -60,10 +58,9 @@ def registrate_optimize_images(
     Returns
     -------
     tuple
-        A tuple ``(new_optimized, ref_pix, info)`` where:
+        A tuple ``(new_optimized, info)`` where:
 
         - ``new_optimized`` is the list of transformed and compressed images,
-        - ``ref_pix`` is the reference pixel size used for the rescaling,
         - ``info`` is a dictionary containing reusable intermediate results.
 
         The dictionary contains the following keys:
@@ -81,7 +78,7 @@ def registrate_optimize_images(
     --------
     >>> import numpy as np
     >>> channels = [np.random.rand(5, 16, 16).astype(np.float32)]
-    >>> optimized, ref_pix, info = registrate_optimize_images(
+    >>> optimized, info = registrate_optimize_images(
     ...     channels,
     ...     channels_x_shifts_nm=[0.0],
     ...     channels_y_shifts_nm=[0.0],
@@ -91,14 +88,14 @@ def registrate_optimize_images(
     ... )
     >>> len(optimized)
     1
-    >>> ref_pix
+    >>> info["ref_pix"]
     (1.0, 1.0)
 
     >>> channels = [
     ...     np.random.rand(5, 16, 16).astype(np.float32),
     ...     np.random.rand(5, 16, 16).astype(np.float32),
     ... ]
-    >>> optimized, ref_pix, info = registrate_optimize_images(
+    >>> optimized, info = registrate_optimize_images(
     ...     channels,
     ...     channels_x_shifts_nm=[0.0, 20.0],
     ...     channels_y_shifts_nm=[0.0, -10.0],
