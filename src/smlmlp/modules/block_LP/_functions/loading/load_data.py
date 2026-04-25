@@ -20,7 +20,7 @@ def load_data(
     *tif_paths,
     chunk=None,
     pad=0,
-    cameras_bboxeses=None,
+    cameras_bboxes=None,
     memmap=True,
     flip=None,
     cuda=False,
@@ -45,7 +45,7 @@ def load_data(
     pad : int, optional
         Number of frames of temporal padding to include before and after each
         chunk.
-    cameras_bboxeses : sequence or None, optional
+    cameras_bboxes : sequence or None, optional
         Per-file list of channel bounding boxes. For each file, each bounding
         box must be given as ``(x0, y0, x1, y1)`` and will be applied as
         ``[:, y0:y1, x0:x1]``.
@@ -121,11 +121,11 @@ def load_data(
     ...     "cam2.tif",
     ...     chunk=500,
     ...     pad=20,
-    ...     cameras_bboxeses=bbox,
+    ...     cameras_bboxes=bbox,
     ... ):
     ...     print(info["chunk0"], info["chunk1"], len(channels))
     """
-    cameras_bboxes = cameras_bboxeses
+    cameras_bboxes = cameras_bboxes
 
     with ExitStack() as stack:
         # Reset timings stored by the block decorator machinery.

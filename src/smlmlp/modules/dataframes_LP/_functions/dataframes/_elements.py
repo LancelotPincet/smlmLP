@@ -16,9 +16,9 @@ class elements(DataFrame) :
     @column(headers=['element'], dtype=np.uint16, save=True, agg='min', index="blinks")
     def elm(self) :
         """Assign element identifiers."""
-        from smlmlp import index_elements
+        from smlmlp import clustering_dbscan
 
-        return index_elements(locs=self.locs)[0]
+        return clustering_dbscan(locs=self.locs)[0]
 
 
     # Fuse

@@ -9,7 +9,7 @@ from smlmlp import analysis
 
 
 @analysis(df_name="points")
-def calibration_zstack(col, /, fr, *, zstack_speed=10., cuda=False, parallel=False) :
+def calibration_zstacks(col, /, fr, *, zstack_speed=10., cuda=False, parallel=False) :
     """
     Placeholder for calibration zstack.
 

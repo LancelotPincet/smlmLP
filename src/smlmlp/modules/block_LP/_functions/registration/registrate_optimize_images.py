@@ -15,11 +15,13 @@ import numpy as np
 def registrate_optimize_images(
     channels,
     /,
+    mode="mean",
     channels_x_shifts_nm=None,
     channels_y_shifts_nm=None,
     channels_rotations_deg=None,
     channels_x_shears=None,
     channels_y_shears=None,
+    optimized=None,
     *,
     channels_pixels_nm=1.0,
     cuda=False,
@@ -36,6 +38,8 @@ def registrate_optimize_images(
     ----------
     channels : sequence of ndarray
         Sequence of image stacks, one per channel.
+    mode : {"mean", "std"}, optional
+        Projection used to reduce each channel stack before registration.
     channels_x_shifts_nm : sequence of float
         Per-channel shifts along x, in nanometers.
     channels_y_shifts_nm : sequence of float
@@ -47,7 +51,9 @@ def registrate_optimize_images(
     channels_y_shears : sequence of float
         Per-channel shear values along y.
     optimized : sequence of ndarray or None, optional
-        Optional preallocated output arrays for the transformed images.
+        Optional preallocated output arrays for the transformed images. If
+        provided with larger arrays, centered spatial views are reused when
+        possible.
     channels_pixels_nm : float or sequence, optional
         Pixel size in nanometers. Can be scalar, ``(y, x)``, or per-channel.
     cuda : bool, optional
@@ -73,6 +79,10 @@ def registrate_optimize_images(
             Per-channel x scaling factors.
         ``'scales_y'``
             Per-channel y scaling factors.
+        ``'crop_shape'``
+            Common centered crop shape applied after transformation.
+        ``'crop_bboxes'``
+            Per-channel centered crop boxes as ``(x0, y0, x1, y1)``.
 
     Examples
     --------
@@ -144,9 +154,19 @@ def registrate_optimize_images(
     channels_y_shears = np.zeros(len(channels), dtype=np.float32) if channels_y_shears is None else channels_y_shears
 
     new_optimized = []
+    valid_masks = []
+
+    match mode:
+        case "mean":
+            agg_func = xp.mean
+        case "std":
+            agg_func = xp.std
+        case _:
+            raise SyntaxError(f"Aggregation mode {mode} is not recognized")
+
     for i in range(len(channels)):
         channel = xp.asarray(channels[i])
-        projection = xp.mean(channel, axis=0, dtype=np.float32)
+        projection = agg_func(channel, axis=0, dtype=np.float32)
 
         # Build the rescaling and registration transforms, then combine them.
         matrix1 = transform_matrix(
@@ -164,27 +184,168 @@ def registrate_optimize_images(
         )
         matrix = matrix1 @ matrix2
 
-        # Apply the geometric transform and then compress the intensity range.
+        # Apply the geometric transform and keep a transformed validity mask so
+        # the final centered crop can avoid affine border pixels.
         optimize = img_transform(
             projection,
             matrix=matrix,
             cuda=cuda,
-            parallel=parallel,
+            parallel=False,
         )
-        optimize = compress(
+        new_optimized.append(optimize)
+        valid_masks.append(
+            _transform_valid_mask(
+                projection.shape,
+                matrix,
+                cuda=cuda,
+            )
+        )
+
+    # Crop transformed images around their centers so registration images share
+    # the same valid spatial support after rescaling to the reference pixel size.
+    crop_shape = _largest_centered_valid_crop(valid_masks)
+    new_optimized, crop_shape, crop_bboxes = _center_crop_arrays(
+        new_optimized,
+        crop_shape,
+        outputs=optimized,
+    )
+
+    for i, optimize in enumerate(new_optimized):
+        new_optimized[i] = compress(
             optimize,
             out=optimize,
             white_percent=1,
             black_percent=1,
             saturate=True,
         )
-        new_optimized.append(optimize)
 
     info = {
         "channels_pixels_nm": channels_pixels_nm,
         "ref_pix": ref_pix,
         "scales_x": scales_x,
         "scales_y": scales_y,
+        "crop_shape": crop_shape,
+        "crop_bboxes": crop_bboxes,
     }
 
     return new_optimized, info
+
+
+
+def _transform_valid_mask(shape, matrix, cuda=False):
+    """Transform a mask that tracks pixels not filled by affine borders."""
+    xp = get_xp(cuda)
+    mask = xp.ones(shape, dtype=xp.float32)
+    mask = img_transform(
+        mask,
+        matrix=matrix,
+        cuda=cuda,
+        parallel=False,
+        order=0,
+        cval=0.0,
+    )
+
+    return mask > 0.5
+
+
+
+def _largest_centered_valid_crop(valid_masks):
+    """Find the largest centered crop valid in every mask."""
+    base_shape = np.asarray(
+        (
+            min([mask.shape[0] for mask in valid_masks]),
+            min([mask.shape[1] for mask in valid_masks]),
+        ),
+        dtype=int,
+    )
+
+    lo, hi = 1, int(base_shape.min())
+    best_shape = None
+
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        scale = mid / base_shape.min()
+        crop_shape = np.maximum(1, np.floor(base_shape * scale).astype(int))
+
+        if _valid_centered_crop(valid_masks, crop_shape):
+            best_shape = tuple(int(size) for size in crop_shape)
+            lo = mid + 1
+        else:
+            hi = mid - 1
+
+    if best_shape is None:
+        raise ValueError("No centered crop without transformed border pixels found")
+
+    return best_shape
+
+
+
+def _valid_centered_crop(valid_masks, crop_shape):
+    """Return whether the centered crop is fully valid in every mask."""
+    for mask in valid_masks:
+        y0 = (mask.shape[0] - crop_shape[0]) // 2
+        x0 = (mask.shape[1] - crop_shape[1]) // 2
+        y1 = y0 + crop_shape[0]
+        x1 = x0 + crop_shape[1]
+
+        valid = mask[y0:y1, x0:x1].all()
+        if hasattr(valid, "item"):
+            valid = valid.item()
+        if not valid:
+            return False
+
+    return True
+
+
+
+def _center_crop_arrays(arrays, crop_shape, outputs=None):
+    """Center-crop arrays to a shared spatial shape."""
+
+    cropped = []
+    crop_bboxes = []
+    for i, array in enumerate(arrays):
+        y0 = (array.shape[0] - crop_shape[0]) // 2
+        x0 = (array.shape[1] - crop_shape[1]) // 2
+        y1 = y0 + crop_shape[0]
+        x1 = x0 + crop_shape[1]
+
+        crop = array[y0:y1, x0:x1]
+        crop = _copy_to_output(crop, outputs, i, name="optimized")
+        cropped.append(crop)
+        crop_bboxes.append((x0, y0, x1, y1))
+
+    return cropped, crop_shape, crop_bboxes
+
+
+
+def _copy_to_output(array, outputs, index, name="outputs"):
+    """Copy an array into a reusable output buffer when one is available."""
+    if outputs is None:
+        return array
+    if len(outputs) <= index:
+        raise ValueError(f"{name} does not have enough output arrays")
+
+    out = _output_view(outputs[index], array.shape)
+    if out is None:
+        return array
+
+    out[...] = array
+    return out
+
+
+
+def _output_view(output, shape):
+    """Return a compatible centered view into an output buffer, if possible."""
+    if output.shape == shape:
+        return output
+    if output.ndim != len(shape):
+        return None
+    if any(out_size < size for out_size, size in zip(output.shape, shape)):
+        return None
+
+    slices = []
+    for out_size, size in zip(output.shape, shape):
+        start = (out_size - size) // 2
+        slices.append(slice(start, start + size))
+
+    return output[tuple(slices)]

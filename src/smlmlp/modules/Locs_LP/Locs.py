@@ -11,12 +11,11 @@ This class define objects corresponding to localizations sets for one experiment
 """
 
 from contextlib import nullcontext
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from corelp import folder, prop, selfkwargs
+from corelp import folder, prop, selfkwargs, Path
 from smlmlp import Config, DetsDataFrame, LocsReceiver, columns, open_df, save_df
 
 

@@ -21,7 +21,13 @@ import tifffile as tiff
 import smlmlp.modules.block_LP._functions.blink.blink_temporal_on as blink_temporal_on_module
 from smlmlp.modules.block_LP.block import block
 from smlmlp.modules.block_LP._functions.detection.detect_snr import detect_snr
+from smlmlp.modules.block_LP._functions.globdetection.globdet_channel import (
+    globdet_channels,
+)
 from smlmlp.modules.block_LP._functions.loading.load_data import load_data
+from smlmlp.modules.block_LP._functions.registration.registrate_optimize_images import (
+    registrate_optimize_images,
+)
 from smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant import (
     registrate_solve_redundant,
 )
@@ -126,7 +132,7 @@ def test_load_data_yields_chunk_with_public_bbox_parameter(tmp_path):
             str(path),
             chunk=2,
             pad=0,
-            cameras_bboxeses=[[(1, 1, 4, 3)]],
+            cameras_bboxes=[[(1, 1, 4, 3)]],
             memmap=True,
         )
     )
@@ -147,6 +153,62 @@ def test_detect_snr_accepts_scalar_gain():
 
     np.testing.assert_allclose(snrs[0], [[5.0, 10.0]])
     assert info["channels_gains"] == [1.0]
+
+
+def test_globdet_channels_merges_transformed_channels():
+    """Check global detection returns one mean/std merged channel."""
+    channels = [
+        np.ones((2, 6, 8), dtype=np.float32),
+        np.ones((2, 4, 10), dtype=np.float32) * 3,
+    ]
+
+    global_channels, info = globdet_channels(channels, mode="mean")
+    std_channels, std_info = globdet_channels(channels, mode="std")
+
+    assert len(global_channels) == 1
+    assert len(std_channels) == 1
+    assert global_channels[0].shape == (2, 4, 8)
+    assert std_channels[0].shape == (2, 4, 8)
+    np.testing.assert_allclose(global_channels[0], 2.0)
+    np.testing.assert_allclose(std_channels[0], 1.0)
+    assert len(info["transform_matrices"]) == 2
+    assert len(std_info["transform_matrices"]) == 2
+    assert info["crop_shape"] == (4, 8)
+
+    out = [np.empty_like(global_channels[0])]
+    reused_channels, _ = globdet_channels(channels, mode="mean", global_channels=out)
+    assert reused_channels[0] is out[0]
+
+    shifted_channels, shifted_info = globdet_channels(
+        channels,
+        channels_x_shifts_nm=[1.0, 0.0],
+    )
+    assert shifted_info["crop_shape"][1] < 8
+    np.testing.assert_allclose(shifted_channels[0], 2.0)
+
+
+def test_registrate_optimize_images_crops_transformed_projections():
+    """Check registration projections are cropped to a shared center shape."""
+    channels = [
+        np.arange(3 * 6 * 8, dtype=np.float32).reshape(3, 6, 8),
+        np.arange(3 * 4 * 10, dtype=np.float32).reshape(3, 4, 10),
+    ]
+
+    optimized, info = registrate_optimize_images(channels)
+
+    assert [image.shape for image in optimized] == [(4, 8), (4, 8)]
+    assert info["crop_shape"] == (4, 8)
+
+    out = [np.empty_like(image) for image in optimized]
+    reused_optimized, _ = registrate_optimize_images(channels, optimized=out)
+    assert all(image is buffer for image, buffer in zip(reused_optimized, out))
+
+    shifted_optimized, shifted_info = registrate_optimize_images(
+        channels,
+        channels_x_shifts_nm=[1.0, 0.0],
+    )
+    assert shifted_info["crop_shape"][1] < 8
+    assert len(shifted_optimized) == 2
 
 
 def test_blink_temporal_on_normalizes_scalar_psf_and_default_crop(monkeypatch):
@@ -186,11 +248,6 @@ def test_blink_temporal_on_normalizes_scalar_psf_and_default_crop(monkeypatch):
         (
             "smlmlp.modules.block_LP._functions._block_template",
             "block_template",
-            ([],),
-        ),
-        (
-            "smlmlp.modules.block_LP._functions.globdetection.globdet_channel",
-            "globdet_channels",
             ([],),
         ),
         (
