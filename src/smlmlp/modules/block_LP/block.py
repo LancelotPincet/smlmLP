@@ -16,7 +16,7 @@ This function is a decorator to be used on block function, which allow to use co
 import functools
 import time
 import inspect
-from smlmlp import columns
+from smlmlp import metadatum
 
 
 
@@ -56,8 +56,12 @@ def block(timeit=True) :
                 signature = inspect.signature(function)
                 kw = {}
                 for pname, param in signature.parameters.items() :
+                    attr = kwargs.pop(pname, None)
                     if (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(config, pname) :
-                        kw[pname] = getattr(config, pname)
+                        attr = getattr(config, pname) if attr is None else attr
+                        if any(pname == datum for group in metadatum.groups.values() for datum in group) :
+                            setattr(config, pname, attr)
+                        kw[pname] = attr
                 kw.update(kwargs)
                 kwargs = kw
 

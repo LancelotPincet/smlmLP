@@ -13,8 +13,10 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="detections")
-def index_voxels(fr, *, cuda=False, parallel=False) :
+@analysis(df_name="points")
+def associate_density(xx, yy, fr, *, cuda=False, parallel=False) :
     '''
+    TODO.
     '''
-    return fr2ch(fr)
+    raise SyntaxeError('Not implemented')
+    None, {}

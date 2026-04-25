@@ -14,7 +14,7 @@ import numba as nb
 
 # %% Function
 @analysis(df_name="detections")
-def index_frames(pix, *, cuda=False, parallel=False) :
+def lost_frames(pix, *, cuda=False, parallel=False) :
     '''
     Analysis for defining frame number with given pixel coordinate.
     Assumption made is that localizations are sorted from smallest pix to biggest.

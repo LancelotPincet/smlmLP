@@ -22,8 +22,8 @@ class channels(DataFrame) :
         if self.locs.config.nchannels == 1 :
             return np.ones(self.locs.ndetections, dtype=np.uint8)
         else :
-            from smlmlp import index_channels
-            return index_channels(locs=self.locs)[0]
+            from smlmlp import lost_channels
+            return lost_channels(locs=self.locs)[0]
     
     
 
@@ -132,3 +132,4 @@ class channels(DataFrame) :
     @column(headers=['y cropsize [nm]'], dtype=np.float32, save=False, agg='mean')
     def y_cropsize(self) :
         return self.y_cropshape * self.y_pixel
+

@@ -13,9 +13,10 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="detections")
-def zaxis_astig(x, y, *, cuda=False, parallel=False) :
+@analysis(df_name="blinks")
+def image_smlm3d(col, /, xx, yy, crlb=None, *, pixel_smlm=15., cuda=False, parallel=False) :
     '''
     TODO.
     '''
-    pass
+    raise SyntaxeError('Not implemented')
+    None, {}

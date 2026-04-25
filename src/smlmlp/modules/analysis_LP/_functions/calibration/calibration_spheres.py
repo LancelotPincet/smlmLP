@@ -13,9 +13,11 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="detections")
-def demix_flux(x, y, *, cuda=False, parallel=False) :
+
+@analysis(df_name="points")
+def calibration_spheres(col, /, xx, yy, elm, *, cuda=False, parallel=False) :
     '''
     TODO.
     '''
-    pass
+    raise SyntaxeError('Not implemented')
+    None, {}

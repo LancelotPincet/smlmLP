@@ -14,8 +14,9 @@ import numba as nb
 
 # %% Function
 @analysis(df_name="detections")
-def modloc_sequential(x, y, *, cuda=False, parallel=False) :
+def modloc_transverse(x_eff, y_eff, phase, *, modloc_transverse_angle_deg=0., cuda=False, parallel=False) :
     '''
     TODO.
     '''
-    pass
+    raise SyntaxeError('Not implemented')
+    None, None, {}

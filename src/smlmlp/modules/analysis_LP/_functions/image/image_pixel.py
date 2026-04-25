@@ -13,8 +13,10 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="detections")
-def index_dyes(fr, *, cuda=False, parallel=False) :
+@analysis(df_name="blink")
+def image_pixel(col, /, xx, yy, smooth_sigma_nm, *, cuda=False, parallel=False) :
     '''
+    TODO.
     '''
-    return fr2ch(fr)
+    raise SyntaxeError('Not implemented')
+    None, {}

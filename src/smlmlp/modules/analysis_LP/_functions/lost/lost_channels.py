@@ -14,13 +14,15 @@ import numba as nb
 
 # %% Function
 @analysis(df_name="detections")
-def index_channels(fr, *, cuda=False, parallel=False) :
+def lost_channels(fr, *, cuda=False, parallel=False) :
     '''
     Analysis for defining channel number with given frame coordinate.
     Assumption made is that localizations are sorted from smallest frame to biggest.
     When fr is decreasing it means we changed channel.
     '''
     return fr2ch(fr)
+
+
 
 @nb.njit(cache=True)
 def fr2ch(fr) :

@@ -33,13 +33,29 @@ class detections(MainDataFrame) :
 
     # --- Detections ---
 
+    @column(headers=['x global detection [nm]'], dtype=np.float32, save=True, agg='mean')
+    def x_globdet(self) :
+        return None
+
+    @column(headers=['y global detection [nm]'], dtype=np.float32, save=True, agg='mean')
+    def y_globdet(self) :
+        return None
+
     @column(headers=['x detection [nm]'], dtype=np.float32, save=True, agg='mean')
     def x_det(self) :
-        return None
+        if self.x_globdet is None or self.y_globdet is None : return None
+        if self.config.nchannels == 1 : return "x_globdet"
+        from smlmlp import inv_transform_locs
+        self.x_det, self.y_det, _ = inv_transform_locs(locs=self.locs)
+        return "x_det"
 
     @column(headers=['y detection [nm]'], dtype=np.float32, save=True, agg='mean')
     def y_det(self) :
-        return None
+        if self.x_globdet is None or self.y_globdet is None : return None
+        if self.config.nchannels == 1 : return "y_globdet"
+        from smlmlp import inv_transform_locs
+        self.x_det, self.y_det, _ = inv_transform_locs(locs=self.locs)
+        return "y_det"
 
 
 
@@ -52,6 +68,22 @@ class detections(MainDataFrame) :
     @column(headers=['y fit [nm]'], dtype=np.float32, save=True, agg='mean')
     def y_fit(self) :
         return "y_det"
+
+    @column(headers=['x global fit [nm]'], dtype=np.float32, save=True, agg='mean')
+    def x_globfit(self) :
+        if self.x_fit is None or self.y_fit is None : return None
+        if self.config.nchannels == 1 : return "x_fit"
+        from smlmlp import transform_locs
+        self.x_globfit, self.y_globfit, _ = transform_locs(locs=self.locs)
+        return "x_globfit"
+
+    @column(headers=['y global fit [nm]'], dtype=np.float32, save=True, agg='mean')
+    def y_globfit(self) :
+        if self.x_fit is None or self.y_fit is None : return None
+        if self.config.nchannels == 1 : return "y_fit"
+        from smlmlp import transform_locs
+        self.x_globfit, self.y_globfit, _ = transform_locs(locs=self.locs)
+        return "y_globfit"
 
     @column(headers=['z fit [nm]'], dtype=np.float32, save=True, agg='mean')
     def z_fit(self) :
@@ -96,6 +128,42 @@ class detections(MainDataFrame) :
     @column(headers=['converged'], dtype=np.bool_, save=True, agg='min')
     def converged(self) :
         return None
+
+
+
+    # --- Effective ---
+
+    @column(headers=['x effective [photon]'], dtype=np.float32, save=True, agg='mean')
+    def x_eff(self) :
+        if all([self.locs.config.x_channels[i]==i+1 for i in range(self.locs.config.nchannels)]) :
+            return "x_globfit"
+        array = np.copy(self.x_globfit)
+        array[~np.isin(self.ch, self.locs.config.x_channels)] = np.nan
+        return array
+
+    @column(headers=['y effective [photon]'], dtype=np.float32, save=True, agg='mean')
+    def y_eff(self) :
+        if all([self.locs.config.y_channels[i]==i+1 for i in range(self.locs.config.nchannels)]) :
+            return "y_globfit"
+        array = np.copy(self.y_globfit)
+        array[~np.isin(self.ch, self.locs.config.y_channels)] = np.nan
+        return array
+
+    @column(headers=['z effective [photon]'], dtype=np.float32, save=True, agg='mean')
+    def z_eff(self) :
+        if all([self.locs.config.z_channels[i]==i+1 for i in range(self.locs.config.nchannels)]) :
+            return "z_fit"
+        array = np.copy(self.z_fit)
+        array[~np.isin(self.ch, self.locs.config.z_channels)] = np.nan
+        return array
+
+    @column(headers=['intensity effective [photon]'], dtype=np.float32, save=True, agg='mean')
+    def intensity_eff(self) :
+        if all([self.locs.config.intensity_channels[i]==i+1 for i in range(self.locs.config.nchannels)]) :
+            return "intensity"
+        array = np.copy(self.intensity)
+        array[~np.isin(self.ch, self.locs.config.intensity_channels)] = np.nan
+        return array
 
 
 

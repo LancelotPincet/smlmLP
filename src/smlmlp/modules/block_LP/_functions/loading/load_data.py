@@ -22,7 +22,7 @@ def load_data(
     *tif_paths,
     chunk=None,
     pad=0,
-    cameras_bbox=None,
+    cameras_bboxeses=None,
     memmap=True,
     flip=None,
     iterator=range,
@@ -45,7 +45,7 @@ def load_data(
     pad : int, optional
         Number of frames of temporal padding to include before and after each
         chunk.
-    cameras_bbox : sequence or None, optional
+    cameras_bboxes : sequence or None, optional
         Per-file list of channel bounding boxes. For each file, each bounding
         box must be given as ``(x0, y0, x1, y1)`` and will be applied as
         ``[:, y0:y1, x0:x1]``.
@@ -117,7 +117,7 @@ def load_data(
     ...     "cam2.tif",
     ...     chunk=500,
     ...     pad=20,
-    ...     cameras_bbox=bbox,
+    ...     cameras_bboxes=bbox,
     ... ):
     ...     print(info["chunk0"], info["chunk1"], len(channels))
     """
@@ -135,10 +135,10 @@ def load_data(
 
         # Default to one full-frame channel per file when no bounding boxes are
         # provided.
-        if cameras_bbox is None:
-            cameras_bbox = [[(0, 0, shape[2], shape[1])] for shape in shapes]
+        if cameras_bboxes is None:
+            cameras_bboxes = [[(0, 0, shape[2], shape[1])] for shape in shapes]
 
-        nchannels = [len(box) for box in cameras_bbox]
+        nchannels = [len(box) for box in cameras_bboxes]
         if len(nchannels) != nfiles:
             raise ValueError("Did not give the same amount of bbox as files")
 
@@ -260,7 +260,7 @@ def load_data(
             channels = []
             count = 0
 
-            for load, mmap, box in zip(loads, mmaps_chunks, cameras_bbox):
+            for load, mmap, box in zip(loads, mmaps_chunks, cameras_bboxes):
                 for bb in box:
                     x0, y0, x1, y1 = bb
                     channel = (

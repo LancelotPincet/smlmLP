@@ -49,7 +49,10 @@ class Config() :
 
 
     # Init
-    def __init__(self, *tif_paths, config=None, **kwargs) :
+    def __init__(self, *tif_paths, config=None, locs=None, **kwargs) :
+
+        # Attach locs object
+        self.locs = locs
 
         # Opening tif files
         self.ncameras = max(len(tif_paths), 1)
@@ -142,10 +145,6 @@ class Config() :
         xmin = min([camera.FOV_max_um[1] for camera in self.cameras])
         return ymin, xmin
 
-    @property
-    def cameras_bbox(self) :
-        FOV = self.FOV_max_um
-        return [camera.FOV2bbox(FOV) for camera in self.cameras]
     @property
     def frame_bytes(self) : # gigabytes/frame
         return sum([camera.frame_bytes for camera in self.cameras])
@@ -365,7 +364,51 @@ class Config() :
 
 
 
-    # Points
+    # Effective values
+
+    @metadatum('Effective')
+    def intensity_channels(self) :
+        return [idx for idx in range(1, self.nchannels + 1)]
+    @intensity_channels.setter
+    def intensity_channels(self, value) :
+        if np.ndim(value) == 0 : 
+            self._intensity_channels = [value]
+        else :
+            self._intensity_channels = value
+
+    @metadatum('Effective')
+    def x_channels(self) :
+        return [idx for idx in range(1, self.nchannels + 1)]
+    @x_channels.setter
+    def x_channels(self, value) :
+        if np.ndim(value) == 0 : 
+            self._x_channels = [value]
+        else :
+            self._x_channels = value
+
+    @metadatum('Effective')
+    def y_channels(self) :
+        return [idx for idx in range(1, self.nchannels + 1)]
+    @y_channels.setter
+    def y_channels(self, value) :
+        if np.ndim(value) == 0 : 
+            self._y_channels = [value]
+        else :
+            self._y_channels = value
+
+    @metadatum('Effective')
+    def z_channels(self) :
+        return [idx for idx in range(1, self.nchannels + 1)]
+    @z_channels.setter
+    def z_channels(self, value) :
+        if np.ndim(value) == 0 : 
+            self._z_channels = [value]
+        else :
+            self._z_channels = value
+
+
+
+    # Methods
 
     @metadatum('Methods')
     def x_method(self) : # string
@@ -431,15 +474,6 @@ class Config() :
         self._lifetime_method = value.lower()
 
     @metadatum('Methods')
-    def frequency_method(self) : # string
-        return "spadarray"
-    @frequency_method.setter
-    def frequency_method(self, value) :
-        assert type(value) is str
-        assert value.lower() in ["singlespad", "spadarray"]
-        self._frequency_method = value.lower()
-
-    @metadatum('Methods')
     def drift_method(self) : # string
         return "none"
     @drift_method.setter
@@ -450,18 +484,27 @@ class Config() :
 
     @metadatum('Methods')
     def demix_method(self) : # string
-        return "spectral"
+        return "flux"
     @demix_method.setter
     def demix_method(self, value) :
         assert type(value) is str
         assert value.lower() in ["flux", "spectral", "lifetime"]
         self._demix_method = value.lower()
 
+    @metadatum('Methods')
+    def demix2d_method(self) : # string
+        return "spectral"
+    @demix_method.setter
+    def demix_method(self, value) :
+        assert type(value) is str
+        assert value.lower() in ["spectral"]
+        self._demix_method = value.lower()
 
 
-    # Labelling
+
+    # Targets
     
-    @metadatum('Labelling')
+    @metadatum('Targets')
     def dyes(self) : # string list
         return ['unknown']
     @dyes.setter
@@ -480,9 +523,179 @@ class Config() :
 
     @metadatum('Data')
     def irradiance_image(self) : # 2D image
+        if self.locs is not None :
+            from smlmlp import image_pixel
+            return image_pixel(self.os, None, locs=self.locs)[0]
         return None
 
 
+
+    # Association
+
+    @metadatum('Association')
+    def channel_association_radius_nm(self) : # nm
+        return 30.
+
+    @metadatum('Association')
+    def blink_association_radius_nm(self) : # nm
+        if self.locs is not None :
+            from smlmlp import associate_consecutive_frames_radius
+            return associate_consecutive_frames_radius(locs=self.locs)[0]
+        return 30.
+
+    @metadatum('Association')
+    def blink_z_association_radius_nm(self) : # nm
+        return 100.
+
+    @metadatum('Association')
+    def track_association_radius_nm(self) : # nm
+        return 500.
+
+
+
+    # Ratio
+
+    @metadatum('Ratio')
+    def spectral_x_channels(self) : # nm
+        return [idx for idx in range(1, self.nchannels)] if self.nchannels > 1 else [self.nchannels]
+
+    @metadatum('Ratio')
+    def spectral_y_channels(self) : # nm
+        return [self.nchannels]
+
+    @metadatum('Ratio')
+    def biplane_x_channels(self) : # nm
+        return [idx for idx in range(1, self.nchannels)] if self.nchannels > 1 else [self.nchannels]
+
+    @metadatum('Ratio')
+    def biplane_y_channels(self) : # nm
+        return [self.nchannels]
+
+    @metadatum('Ratio')
+    def donald_x_channels(self) : # nm
+        return [idx for idx in range(1, self.nchannels)] if self.nchannels > 1 else [self.nchannels]
+
+    @metadatum('Ratio')
+    def donald_y_channels(self) : # nm
+        return [self.nchannels]
+
+    @metadatum('Ratio')
+    def iflim_x_channels(self) : # nm
+        return [idx for idx in range(1, self.nchannels)] if self.nchannels > 1 else [self.nchannels]
+
+    @metadatum('Ratio')
+    def iflim_y_channels(self) : # nm
+        return [self.nchannels]
+
+
+
+    # Modloc
+
+    @metadatum('Modloc')
+    def modloc_transverse_angle_deg(self) : # deg
+        return 0.
+
+    @metadatum('Modloc')
+    def modloc_axial_angle_deg(self) : # nm
+        return 0.
+
+    @metadatum('Modloc')
+    def modloc_channels_indices(self) : # nm
+        return [1, 2, 3, 4]
+
+    @metadatum('Modloc')
+    def modloc_sequential_frames(self) : # nm
+        return 1
+
+    @metadatum('Modloc')
+    def modloc_dephases_rad(self) : # nm
+        return [0, np.pi/2, np.pi, 3*np.pi/2]
+
+
+
+    # Calibrations
+
+    @metadatum('Data')
+    def x_timeloc_calibration(self) : # nm / Hz
+        return None
+
+    @metadatum('Data')
+    def y_timeloc_calibration(self) : # nm / Hz
+        return None
+
+    @metadatum('Data')
+    def z_timeloc_calibration(self) : # nm / Hz
+        return None
+
+    @metadatum('Data')
+    def z_astig_calibration(self) : # nm / ratio
+        return None
+
+    @metadatum('Data')
+    def z_biplane_calibration(self) : # nm / ratio
+        return None
+
+    @metadatum('Data')
+    def z_donald_calibration(self) : # nm / ratio
+        return None
+
+    @metadatum('Data')
+    def z_miet_calibration(self) : # nm / ns
+        return None
+
+    @metadatum('Data')
+    def z_qtirf_calibration(self) : # nm / ns
+        return None
+
+    @metadatum('Data')
+    def lifetime_iflim_calibration(self) : # ns / ratio
+        return None
+
+
+
+    # Time
+    
+    @metadatum('Time')
+    def frames_per_sequence(self) :
+        return 1000
+
+    @metadatum('Time')
+    def zstack_speed(self) : # nm / frame
+        return 10.
+
+
+
+    # Drifts
+    
+    @metadatum('Drift')
+    def aim_(self) :
+        return 10.
+
+    @metadatum('Drift')
+    def comet_(self) :
+        return 10.
+
+    @metadatum('Drift')
+    def crosscorr_(self) :
+        return 10.
+
+    @metadatum('Drift')
+    def meanshift_(self) :
+        return 10.
+
+
+
+    # Clusters
+
+    @metadatum('Clusters')
+    def dbscan_eps(self) : # nm
+        return 50.
+
+    @metadatum('Clusters')
+    def dbscan_min_points(self) :
+        return 10.
+
+    
 
 def get_datas(data) :
     """ adds 's' to data parameter caring for units"""
@@ -493,6 +706,8 @@ def get_datas(data) :
             break
     if data.endswith('us') : data = f'{data[:-2]}i'
     elif data.endswith('ex') : data = f'{data[:-2]}ices'
+    elif data.endswith('ix') : data = f'{data[:-2]}ices'
+    elif data.endswith('ox') : data = f'{data[:-2]}oxes'
     elif not data.endswith('s') and not data.endswith('x') and data[-1].upper() != data[-1] : data = f'{data}s'
     return data + suffix
 

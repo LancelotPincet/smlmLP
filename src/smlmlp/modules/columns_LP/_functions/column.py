@@ -127,7 +127,9 @@ class column:
     def _drop_column(self, df, header):
         df.drop(columns=[header], inplace=True, errors="ignore")
 
-    def _ensure_column_materialized(self, df, col_name, header_name=None):
+    def _ensure_column_materialized(
+        self, df, col_name, header_name=None, allow_none=False
+    ):
         """
         Ensure a logical column exists physically in df.columns.
 
@@ -138,15 +140,25 @@ class column:
             Descriptor/property name.
         header_name : str or None
             Physical header name to check. If None, uses col_name.
+        allow_none : bool, default=False
+            If True, return False instead of raising when the column cannot
+            be materialized.
+
+        Returns
+        -------
+        bool
+            True if the physical header exists after this call, else False.
         """
         if header_name is None:
             header_name = col_name
 
         if header_name in df.columns:
-            return
+            return True
 
         value = getattr(df, col_name, None)
         if value is None:
+            if allow_none:
+                return False
             raise ValueError(
                 f"{col_name} not in {getattr(df, 'df_name', df.__class__.__name__)} and cannot be materialized"
             )
@@ -154,17 +166,31 @@ class column:
         if header_name not in df.columns:
             setattr(df, col_name, value)
 
-    def _aggregate_parent_to_child(self, parent, child, value_header):
+        if header_name in df.columns:
+            return True
+
+        if allow_none:
+            return False
+
+        raise ValueError(
+            f"{col_name} not in {getattr(df, 'df_name', df.__class__.__name__)} and cannot be materialized"
+        )
+
+    def _aggregate_parent_to_child(self, parent, child, value_header, allow_none=False):
         """
         Aggregate parent[value_header] into child rows by child.index_header,
         aligned explicitly on child.index.
         """
         if value_header not in parent.columns:
+            if allow_none:
+                return None
             raise ValueError(
                 f"{value_header} not in {child.parent_name} and cannot be merged into {child.df_name}"
             )
 
         if child.index_header not in parent.columns:
+            if allow_none:
+                return None
             raise ValueError(
                 f"{child.index_header} not in {child.parent_name} and cannot be used to merge {value_header} into {child.df_name}"
             )
@@ -182,16 +208,25 @@ class column:
 
         return array
 
-    def _map_child_to_detections(self, child, value_header):
+    def _map_child_to_detections(self, child, value_header, allow_none=False):
         """
         Spread child[value_header] into detections using detections[child.index_header].
         """
         dets = child.locs.detections
 
         if child.index_header not in dets.columns:
-            self._ensure_column_materialized(dets, child.index_col, child.index_header)
+            materialized = self._ensure_column_materialized(
+                dets,
+                child.index_col,
+                child.index_header,
+                allow_none=allow_none,
+            )
+            if not materialized:
+                return None
 
         if value_header not in child.columns:
+            if allow_none:
+                return None
             raise ValueError(
                 f"{value_header} not in {child.df_name} and cannot be spread into detections"
             )
@@ -219,20 +254,39 @@ class column:
             ):
                 if self.header not in df.columns:
                     parent = getattr(df.locs, df.parent_name)
+                    if parent is None:
+                        return None
 
                     # Ensure parent has the value column physically available
                     if self.header not in parent.columns:
-                        self._ensure_column_materialized(parent, self.col, self.header)
+                        if not self._ensure_column_materialized(
+                            parent,
+                            self.col,
+                            self.header,
+                            allow_none=True,
+                        ):
+                            return None
 
                     # Ensure parent has the grouping/index map physically available
                     if df.index_header not in parent.columns:
-                        self._ensure_column_materialized(parent, df.index_col, df.index_header)
+                        if not self._ensure_column_materialized(
+                            parent,
+                            df.index_col,
+                            df.index_header,
+                            allow_none=True,
+                        ):
+                            return None
 
-                    df[self.header] = self._aggregate_parent_to_child(
+                    merged = self._aggregate_parent_to_child(
                         parent=parent,
                         child=df,
                         value_header=self.header,
+                        allow_none=True,
                     )
+                    if merged is None:
+                        return None
+
+                    df[self.header] = merged
 
                 return df[self.header].to_numpy()
 
@@ -332,15 +386,26 @@ class column:
                 if self.header not in dets.columns:
                     df = getattr(dets.locs, self.df_name)
                     if df is None:
-                        raise ValueError(
-                            f"{self.cls.index_header} not in detections and cannot be used "
-                            f"to spread {self.header} from {self.df_name}"
-                        )
+                        return None
 
                     if self.header not in df.columns:
-                        self._ensure_column_materialized(df, self.col, self.header)
+                        if not self._ensure_column_materialized(
+                            df,
+                            self.col,
+                            self.header,
+                            allow_none=True,
+                        ):
+                            return None
 
-                    dets[self.header] = self._map_child_to_detections(df, self.header)
+                    spread = self._map_child_to_detections(
+                        df,
+                        self.header,
+                        allow_none=True,
+                    )
+                    if spread is None:
+                        return None
+
+                    dets[self.header] = spread
 
                 return dets[self.header].to_numpy()
 

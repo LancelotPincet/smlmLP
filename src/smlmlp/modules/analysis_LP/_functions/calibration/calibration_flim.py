@@ -13,9 +13,10 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="detections")
-def timeloc_spadarray(x, y, *, cuda=False, parallel=False) :
+@analysis(df_name="points")
+def calibration_flim(col, / , *, cuda=False, parallel=False) :
     '''
     TODO.
     '''
-    pass
+    raise SyntaxeError('Not implemented')
+    None, {}

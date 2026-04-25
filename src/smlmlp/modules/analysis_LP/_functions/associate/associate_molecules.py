@@ -13,8 +13,10 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="detections")
-def index_elements(fr, *, cuda=False, parallel=False) :
+@analysis(df_name="blinks")
+def associate_molecules(xx, yy, *, cuda=False, parallel=False) :
     '''
+    TODO.
     '''
-    return fr2ch(fr)
+    raise SyntaxeError('Not implemented')
+    None, {}

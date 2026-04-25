@@ -9,7 +9,7 @@
 from corelp import prop
 from smlmlp import Camera
 import numpy as np
-from arrlp import coordinates
+from arrlp import coordinates, transform_matrix
 
 
 
@@ -35,16 +35,26 @@ class Channel :
         ("y_shear", "Registration"),
         ("wf_image", "Data"),
         ]
-    properties = ["psf_sigma_nm", "psf_radius_nm", "psf_diameter_nm", "psf_fwhm_nm", "spatial_kernel", "spatial_kernel_shape", "psf_kernel", "default_crop_nm", "crop_pix"]
+    properties = ["channel_index", "psf_sigma_nm", "psf_radius_nm", "psf_diameter_nm", "psf_fwhm_nm", "spatial_kernel", "spatial_kernel_shape", "psf_kernel", "default_crop_nm", "crop_pix", "image_transform_matrix", "locs_transform_matrix"]
 
 
 
     def __init__(self, camera) :
         self.camera = camera
 
+    @property
+    def channel_index(self) :
+        for i in range(self.camera.nchannels) :
+            if self.camera.channels[i] is self :
+                return i
+
 
 
     # Bounding box
+
+    @prop(iterable=2, dtype=bool)
+    def bbox(self) :
+        return self.bboxes[self.channel_index]
 
     @prop(iterable=2, dtype=bool)
     def flip(self) :
@@ -211,6 +221,14 @@ class Channel :
     @prop()
     def y_shear(self) :
         return 0.
+    @prop()
+    def image_transform_matrix(self) :
+        shape = self.bbox[3]-self.bbox[1], self.bbox[2]-self.bbox[0]
+        return transform_matrix(shape=shape, shiftx=self.x_shift_nm/self.pixel_nm[1], shifty=self.y_shift_nm/self.pixel_nm[0], shearx=self.x_shear, sheary=self.y_shear, angle=self.rotation_deg)
+    @prop()
+    def locs_transform_matrix(self) :
+        shape = (self.bbox[3]-self.bbox[1]) * self.pixel_nm[0], (self.bbox[2]-self.bbox[0]) * self.pixel_nm[1]
+        return transform_matrix(shape=shape, shiftx=self.x_shift_nm, shifty=self.y_shift_nm, shearx=self.x_shear, sheary=self.y_shear, angle=self.rotation_deg)
 
 
 
@@ -218,6 +236,9 @@ class Channel :
 
     @prop()
     def wf_image(self) : # 2D image
+        if self.locs is not None :
+            from smlmlp import image_pixel
+            return image_pixel(self.locs.intensity, self.psf_sigma_nm, locs=self.locs)[0]
         return None
 
 # Adding Camera metadata

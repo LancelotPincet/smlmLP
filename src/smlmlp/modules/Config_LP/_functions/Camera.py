@@ -26,7 +26,7 @@ class Camera :
         ("read_noise", "Detections"),
         ("QE", "Cameras"),
         ]
-    properties = ['camera_index', 'gain']
+    properties = ['camera_index', 'gain', "bboxes"]
 
 
 
@@ -85,6 +85,7 @@ class Camera :
 
 
     # Photons counting
+
     @property
     def gain(self) :
         return self.experimental_gain if self.experimental_gain is not None else self.constructor_gain
@@ -106,6 +107,12 @@ class Camera :
         0.8
     
 
+
+    # Bounding box
+    @property
+    def bboxes(self) :
+        FOV = self.config.FOV_max_um
+        return self.FOV2bbox(FOV)
 
     @property
     def FOV_max_um(self) : # (y, y) [µm]

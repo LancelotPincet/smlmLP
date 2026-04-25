@@ -75,12 +75,9 @@ class Locs(LocsReceiver) :
         # Config
         if config is not None :
             self.config_source = config
-        if isinstance(config, Config) :
-            self.config = config
-        else :
-            timeit = self.printer.timeit('opening config file') if self.printer is not None else nullcontext()
-            with timeit :
-                self.config = Config(config=self.config_source, **self.config_kwargs)
+        timeit = self.printer.timeit('opening config file') if self.printer is not None else nullcontext()
+        with timeit :
+            self.config = Config(config=self.config_source, **self.config_kwargs)
 
 
 
@@ -232,25 +229,6 @@ class Locs(LocsReceiver) :
         x, y = self.detections.x, self.detections.y
         mask = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
         return self.filter(mask=mask)
-
-
-
-# Image
-for img in ["wf", "irradiance"] :
-    @property
-    def img_prop(self) :
-        image = getattr(self.config, f'{img}_image', None)
-        if image is None :
-            module = importlib.import_module("smlmlp")
-            function = getattr(module, f"image_{img}")
-            image = function(locs=self.locs)[0]
-            setattr(self.config, f'{img}_image', image)
-        return image
-    @img_prop.setter
-    def img_prop(self, value) :
-        setattr(self.config, f'{img}_image', value)
-    setattr(Locs, f'{img}_image', img_prop)
-
 
 
 

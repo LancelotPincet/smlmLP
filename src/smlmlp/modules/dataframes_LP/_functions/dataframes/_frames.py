@@ -19,8 +19,8 @@ class frames(DataFrame) :
 
     @column(headers=['frame', 'frames'], dtype=np.uint32, save=True, agg='min', index="points")
     def fr(self) :
-        from smlmlp import index_frames
-        return index_frames(locs=self.locs)[0]
+        from smlmlp import lost_frames
+        return lost_frames(locs=self.locs)[0]
 
 
 

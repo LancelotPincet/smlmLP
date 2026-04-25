@@ -21,3 +21,15 @@ class elements(DataFrame) :
     def elm(self) :
         from smlmlp import index_elements
         return index_elements(locs=self.locs)[0]
+
+
+
+    # Fusing
+
+    @column(headers=['element x centroid [nm]'], dtype=np.float32, save=False, agg='mean')
+    def elm_x0(self) :
+        return "x"
+
+    @column(headers=['element y centroid [nm]'], dtype=np.float32, save=False, agg='mean')
+    def elm_y0(self) :
+        return "y"

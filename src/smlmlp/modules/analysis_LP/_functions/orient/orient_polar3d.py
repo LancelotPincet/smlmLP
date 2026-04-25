@@ -14,8 +14,9 @@ import numba as nb
 
 # %% Function
 @analysis(df_name="detections")
-def orient_polar3d(x, y, *, cuda=False, parallel=False) :
+def orient_polar3d(x_eff, y_eff, intensity, *, cuda=False, parallel=False) :
     '''
     TODO.
     '''
-    pass
+    raise SyntaxeError('Not implemented')
+    None, None, {}

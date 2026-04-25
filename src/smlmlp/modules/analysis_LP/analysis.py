@@ -17,11 +17,12 @@ import functools
 import time
 import inspect
 from contextlib import nullcontext
+from smlmlp import metadatum
 
 
 
 # %% Function
-def analysis(timeit=True, df_name='detections', col_name=None) :
+def analysis(timeit=True, df_name='detections') :
     '''
     This function is a decorator to be used on block function, which allow to use config for default values.
     A decorated function can use a config object with config=config_object to defined default value of all the keyword only parameters.
@@ -48,21 +49,27 @@ def analysis(timeit=True, df_name='detections', col_name=None) :
     def decorator(function) :
         name = function.__name__
         @functools.wraps(function)
-        def wrapper(*args, locs=None, df_name=df_name, col_name=col_name, **kwargs) -> None :
+        def wrapper(*args, locs=None, df_name=df_name, **kwargs) -> None :
 
             # Manages kwargs from config and df
             kwargs = {key: value for key, value in kwargs.items() if value is not None}
             if locs is not None :
+                config = locs.config
                 df = getattr(locs, df_name)
-                df.col_name = col_name
                 signature = inspect.signature(function)
                 kw = {}
                 for pname, param in signature.parameters.items() :
+                    attr = kwargs.pop(pname, None)
                     if (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(df, pname) :
-                        kw[pname] = getattr(df, pname)
+                        attr = getattr(df, pname) if attr is None else attr
+                        kw[pname] = attr
+                    elif (param.kind is inspect.Parameter.KEYWORD_ONLY or param.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD) and hasattr(config, pname) :
+                        attr = getattr(config, pname) if attr is None else attr
+                        if any(pname == datum for group in metadatum.groups.values() for datum in group) :
+                            setattr(config, pname, attr)
+                        kw[pname] = attr
                 kw.update(kwargs)
                 kwargs = kw
-                df.col_name = None
                 printer = locs.printer
                 timeit = printer.timeit(f"applying {name} analysis") if printer is not None else nullcontext()
             else :

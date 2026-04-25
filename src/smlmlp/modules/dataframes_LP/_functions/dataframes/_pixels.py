@@ -19,21 +19,22 @@ class pixels(DataFrame) :
 
     @column(headers=['pixel'], dtype=np.uint32, save=True, agg='min', index="blinks")
     def pix(self) :
-        from smlmlp import index_pixels
-        return index_pixels(locs=self.locs)[0]
+        return np.round(self.y / self.y_pixel) * self.x_shape + np.round(self.x / self.x_pixel)
 
 
 
     # Maps
 
-    @column(headers=['wide field [photons]'], dtype=np.float32, save=True, agg='mean')
+    @column(headers=['wide field [photon.pix-2]'], dtype=np.float32, save=True, agg='mean')
     def wf(self) :
         from smlmlp import image_picker
-        return image_picker(self.wf_image, locs=self.locs)[0]
+        return image_picker(self.config.wf_image, locs=self.locs)[0]
 
-    @column(headers=['irradiance [kw.cm-2]'], dtype=np.float32, save=True, agg='mean')
+    @column(headers=['irradiance [photon.pix-2]'], dtype=np.float32, save=True, agg='mean')
     def irradiance(self) :
-        from smlmlp import image_picker
-        return image_picker(self.irradiance_image, locs=self.locs)[0]
+        if self.config.irradiance_image is not None :
+            from smlmlp import image_picker
+            return image_picker(self.config.irradiance_image, locs=self.locs)[0]
+        return "os"
 
 

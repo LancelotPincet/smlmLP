@@ -13,8 +13,10 @@ import numba as nb
 
 
 # %% Function
-@analysis(df_name="detections")
-def metric_nena(fr, *, cuda=False, parallel=False) :
+@analysis(df_name="points")
+def metric_overloc(xx, yy, blk, *, cuda=False, parallel=False) :
     '''
+    TODO.
     '''
-    return fr2ch(fr)
+    raise SyntaxeError('Not implemented')
+    None, {}

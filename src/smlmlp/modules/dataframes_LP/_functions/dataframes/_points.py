@@ -22,43 +22,46 @@ class points(DataFrame) :
         if self.locs.config.nchannels == 1 :
             return self.locs.detections.det
         else :
-            from smlmlp import index_points
-            return index_points(locs=self.locs)[0]
+            from smlmlp import associate_different_channels
+            return associate_different_channels(association_radius_nm=self.locs.config.channel_association_radius_nm, locs=self.locs)[0]
     
 
 
     # --- Coordinates ---
 
-    @column(headers=['x [nm]', 'xnm'], dtype=np.float32, save=True, agg='mean')
-    def x(self) :
-        return self.x_measured - self.dx
+    @column(headers=['x stable [nm]'], dtype=np.float32, save=True, agg='mean')
+    def xx(self) :
+        if self.dx is None : return "x"
+        return self.x - self.dx
 
-    @column(headers=['y [nm]', 'ynm'], dtype=np.float32, save=True, agg='mean')
-    def y(self) :
-        return self.y_measured - self.dy
+    @column(headers=['y stable [nm]'], dtype=np.float32, save=True, agg='mean')
+    def yy(self) :
+        if self.dy is None : return "y"
+        return self.y - self.dy
 
-    @column(headers=['z [nm]', 'znm'], dtype=np.float32, save=True, agg='mean')
-    def z(self) :
-        return self.z_measured - self.dz
+    @column(headers=['z stable [nm]'], dtype=np.float32, save=True, agg='mean')
+    def zz(self) :
+        if self.dz is None : return "z"
+        return self.z - self.dz
 
 
 
     # --- xy ---
 
-    @column(headers=['x measured [nm]'], dtype=np.float32, save=False, agg='mean')
-    def x_measured(self) :
+    @column(headers=['x [nm]', 'xnm'], dtype=np.float32, save=False, agg='mean')
+    def x(self) :
         match self.locs.config.x_method :
-            case "det" : return "x_det"
-            case "fit" : return "x_fit"
+            case "det" : return "x_globdet"
+            case "fit" : return "x_eff"
             case "modloc" : return "x_modloc"
             case "timeloc" : return "x_timeloc"
             case _ : raise ValueError('x-method not recognized')
 
-    @column(headers=['y measured [nm]'], dtype=np.float32, save=False, agg='mean')
-    def y_measured(self) :
+    @column(headers=['y [nm]', 'ynm'], dtype=np.float32, save=False, agg='mean')
+    def y(self) :
         match self.locs.config.y_method :
-            case "det" : return "y_det"
-            case "fit" : return "y_fit"
+            case "det" : return "y_globdet"
+            case "fit" : return "y_eff"
             case "modloc" : return "y_modloc"
             case "timeloc" : return "y_timeloc"
             case _ : raise ValueError('y-method not recognized')
@@ -77,29 +80,29 @@ class points(DataFrame) :
 
     @column(headers=['x timeloc [nm]'], dtype=np.float32, save=True, agg='mean')
     def x_timeloc(self) :
-        from smlmlp import timeloc_transverse
-        self.x_timeloc, self.y_timeloc, _ = timeloc_transverse(locs=self.locs)
-        return "x_timeloc"
+        if self.x_freq is None : return None
+        from smlmlp import calibration_convert
+        return calibration_convert(self.x_freq, self.locs.config.x_timeloc_calibration)[0]
 
     @column(headers=['y timeloc [nm]'], dtype=np.float32, save=True, agg='mean')
     def y_timeloc(self) :
-        from smlmlp import timeloc_transverse
-        self.x_timeloc, self.y_timeloc, _ = timeloc_transverse(locs=self.locs)
-        return "y_timeloc"
+        if self.y_freq is None : return None
+        from smlmlp import calibration_convert
+        return calibration_convert(self.y_freq, self.locs.config.y_timeloc_calibration)[0]
 
 
 
     # --- z ---
 
-    @column(headers=['z measured [nm]'], dtype=np.float32, save=False, agg='mean')
-    def z_measured(self) :
+    @column(headers=['z [nm]', 'znm'], dtype=np.float32, save=False, agg='mean')
+    def z(self) :
         match self.locs.config.z_method :
-            case "fit" : return "z_fit"
+            case "fit" : return "z_eff"
+            case "modloc" : return "z_modloc"
+            case "timeloc" : return "z_timeloc"
             case "astig" : return "z_astig"
             case "biplane" : return "z_biplane"
             case "donald" : return "z_donald"
-            case "daisy" : return "z_daisy"
-            case "modloc" : return "z_modloc"
             case "miet" : return "z_miet"
             case "qtirf" : return "z_qtirf"
             case _ : raise ValueError('z-method not recognized')
@@ -111,33 +114,34 @@ class points(DataFrame) :
 
     @column(headers=['z timeloc [nm]'], dtype=np.float32, save=True, agg='mean')
     def z_timeloc(self) :
-        from smlmlp import timeloc_axial
-        return timeloc_axial(locs=self.locs)[0]
+        if self.z_freq is None : return None
+        from smlmlp import calibration_convert
+        return calibration_convert(self.z_freq, self.locs.config.z_timeloc_calibration)[0]
 
     @column(headers=['z astigmatism [nm]'], dtype=np.float32, save=True, agg='mean')
     def z_astig(self) :
-        from smlmlp import psf_astig
-        return psf_astig(locs=self.locs)[0]
+        from smlmlp import calibration_convert
+        return calibration_convert(self.sigma_ratio, self.locs.config.z_astig_calibration)[0]
 
     @column(headers=['z biplane [nm]'], dtype=np.float32, save=True, agg='mean')
     def z_biplane(self) :
-        from smlmlp import psf_biplane
-        return psf_biplane(locs=self.locs)[0]
+        from smlmlp import calibration_convert
+        return calibration_convert(self.biplane_ratio, self.locs.config.z_biplane_calibration)[0]
 
     @column(headers=['z donald [nm]'], dtype=np.float32, save=True, agg='mean')
     def z_donald(self) :
-        from smlmlp import surface_donald
-        return surface_donald(locs=self.locs)[0]
+        from smlmlp import calibration_convert
+        return calibration_convert(self.donald_ratio, self.locs.config.z_donald_calibration)[0]
 
     @column(headers=['z miet [nm]'], dtype=np.float32, save=True, agg='mean')
     def z_miet(self) :
-        from smlmlp import surface_miet
-        return surface_miet(locs=self.locs)[0]
+        from smlmlp import calibration_convert
+        return calibration_convert(self.lifetime, self.locs.config.z_miet_calibration)[0]
 
     @column(headers=['z qtirf [nm]'], dtype=np.float32, save=True, agg='mean')
     def z_qtirf(self) :
-        from smlmlp import surface_qtirf
-        return surface_qtirf(locs=self.locs)[0]
+        from smlmlp import calibration_convert
+        return calibration_convert(self.intensity/self.irradiance, self.locs.config.z_qtirf_calibration)[0]
 
 
 
@@ -212,39 +216,132 @@ class points(DataFrame) :
 
     @column(headers=['lifetime tcspc [ns]'], dtype=np.float32, save=True, agg='mean')
     def lifetime_tcspc(self) :
-        from smlmlp import flim_tcspc
-        return flim_tcspc(locs=self.locs)[0]
+        return None
 
     @column(headers=['lifetime iflim [ns]'], dtype=np.float32, save=True, agg='mean')
     def lifetime_iflim(self) :
-        from smlmlp import flim_iflim
-        return flim_iflim(locs=self.locs)[0]
+        from smlmlp import calibration_convert
+        return calibration_convert(self.iflim_ratio, self.locs.config.lifetime_iflim_calibration)[0]
 
     @column(headers=['lifetime dpflim [ns]'], dtype=np.float32, save=True, agg='mean')
     def lifetime_dpflim(self) :
-        from smlmlp import flim_dpflim
-        return flim_dpflim(locs=self.locs)[0]
+        from smlmlp import calibration_convert
+        return calibration_convert(self.dpflim_ratio, self.locs.config.lifetime_dpflim_calibration)[0]
 
 
 
     # --- frequency ---
 
-    @column(headers=['frequency [hz]'], dtype=np.float32, save=False, agg='mean')
-    def frequency(self) :
-        match self.locs.config.frequency_method :
-            case "singlespad" : return "frequency_singlespad"
-            case "spadarray" : return "frequency_spadarray"
-            case _ : raise ValueError('timeloc-method not recognized')
+    @column(headers=['x frequency [hz]'], dtype=np.float32, save=True, agg='mean')
+    def x_freq(self) :
+        return None
 
-    @column(headers=['frequency singlespad [hz]'], dtype=np.float32, save=True, agg='mean')
-    def frequency_singlespad(self) :
-        from smlmlp import timeloc_singlespad
-        return timeloc_singlespad(locs=self.locs)[0]
+    @column(headers=['y frequency [hz]'], dtype=np.float32, save=True, agg='mean')
+    def y_freq(self) :
+        return None
 
-    @column(headers=['frequency spadarray [hz]'], dtype=np.float32, save=True, agg='mean')
-    def frequency_spadarray(self) :
-        from smlmlp import timeloc_spadarray
-        return timeloc_spadarray(locs=self.locs)[0]
+    @column(headers=['z frequency [hz]'], dtype=np.float32, save=True, agg='mean')
+    def z_freq(self) :
+        return None
 
+
+
+    # --- spectral ---
+
+    @column(headers=['spectral ratio'], dtype=np.float32, save=True, agg='mean')
+    def spectral_ratio(self) :
+        return self.spectral_y / self.spectral_x
+
+    @column(headers=['spectral x intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def spectral_x(self) :
+        from smlmlp import aggregate_ratio
+        self.spectral_x, self.spectral_y, _ = aggregate_ratio(self.intensity, x_channels=self.spectral_x_channels, y_channels=self.spectral_y_channels, locs=self.locs)
+        return "spectral_x"
+
+    @column(headers=['spectral y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def spectral_y(self) :
+        from smlmlp import aggregate_ratio
+        self.spectral_x, self.spectral_y, _ = aggregate_ratio(self.intensity, x_channels=self.spectral_x_channels, y_channels=self.spectral_y_channels, locs=self.locs)
+        return "spectral_y"
+
+
+
+    # --- biplane ---
+
+    @column(headers=['biplane ratio'], dtype=np.float32, save=True, agg='mean')
+    def biplane_ratio(self) :
+        return self.biplane_y / self.biplane_x
+
+    @column(headers=['biplane x width [nm]'], dtype=np.float32, save=True, agg='mean')
+    def biplane_x(self) :
+        from smlmlp import aggregate_ratio
+        self.biplane_x, self.biplane_y, _ = aggregate_ratio(self.sigma, x_channels=self.biplane_x_channels, y_channels=self.biplane_y_channels, locs=self.locs)
+        return "biplane_x"
+
+    @column(headers=['biplane y width [nm]'], dtype=np.float32, save=True, agg='mean')
+    def biplane_y(self) :
+        from smlmlp import aggregate_ratio
+        self.biplane_x, self.biplane_y, _ = aggregate_ratio(self.sigma, x_channels=self.biplane_x_channels, y_channels=self.biplane_y_channels, locs=self.locs)
+        return "biplane_y"
+
+
+
+    # --- donald ---
+
+    @column(headers=['donald ratio'], dtype=np.float32, save=True, agg='mean')
+    def donald_ratio(self) :
+        return self.donald_y / self.donald_x
+
+    @column(headers=['donald x intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def donald_x(self) :
+        from smlmlp import aggregate_ratio
+        self.donald_x, self.donald_y, _ = aggregate_ratio(self.sigma, x_channels=self.donald_x_channels, y_channels=self.donald_y_channels, locs=self.locs)
+        return "donald_x"
+
+    @column(headers=['donald y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def donald_y(self) :
+        from smlmlp import aggregate_ratio
+        self.donald_x, self.donald_y, _ = aggregate_ratio(self.sigma, x_channels=self.donald_x_channels, y_channels=self.donald_y_channels, locs=self.locs)
+        return "donald_y"
+
+
+
+    # --- iflim ---
+
+    @column(headers=['iflim ratio'], dtype=np.float32, save=True, agg='mean')
+    def iflim_ratio(self) :
+        return self.iflim_y / self.iflim_x
+
+    @column(headers=['iflim x intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def iflim_x(self) :
+        from smlmlp import aggregate_ratio
+        self.iflim_x, self.iflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.iflim_x_channels, y_channels=self.iflim_y_channels, locs=self.locs)
+        return "iflim_x"
+
+    @column(headers=['iflim y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def iflim_y(self) :
+        from smlmlp import aggregate_ratio
+        self.iflim_x, self.iflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.iflim_x_channels, y_channels=self.iflim_y_channels, locs=self.locs)
+        return "iflim_y"
+
+
+
+    # --- dpflim ---
+
+    @column(headers=['dpflim ratio'], dtype=np.float32, save=True, agg='mean')
+    def dpflim_ratio(self) :
+        return self.dpflim_y / self.dpflim_x
+
+    @column(headers=['dpflim x intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def dpflim_x(self) :
+        from smlmlp import aggregate_ratio
+        self.dpflim_x, self.dpflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.dpflim_x_channels, y_channels=self.dpflim_y_channels, locs=self.locs)
+        return "dpflim_x"
+
+    @column(headers=['dpflim y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
+    def dpflim_y(self) :
+        from smlmlp import aggregate_ratio
+        self.dpflim_x, self.dpflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.dpflim_x_channels, y_channels=self.dpflim_y_channels, locs=self.locs)
+        return "dpflim_y"
 
 

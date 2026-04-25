@@ -19,15 +19,6 @@ class molecules(DataFrame) :
 
     @column(headers=['molecule'], dtype=np.uint64, save=True, agg='min', index="blinks")
     def mol(self) :
-        from smlmlp import index_molecules
-        return index_molecules(locs=self.locs)[0]
+        from smlmlp import associate_molecules
+        return associate_molecules(locs=self.locs)[0]
 
-
-
-    # --- Photophysics ---
-
-    @column(headers=['off time [ms]'], dtype=np.float32, save=True, agg='mean')
-    def off_time(self) :
-        unique, counts = np.unique(self.locs.blinks.mol, return_counts=True)
-        if unique[0] == 0 : unique, counts = unique[1:], counts[1:]
-        return counts * self.locs.config.exposure_ms
