@@ -18,8 +18,8 @@ def crop_individual_extract(
     channels,
     /,
     fr,
-    x,
-    y,
+    x_det,
+    y_det,
     ch=None,
     *,
     channels_crops_pix=11,
@@ -40,10 +40,10 @@ def crop_individual_extract(
         Sequence of image stacks, one per channel.
     fr : array-like
         Frame indices (starting at 1).
-    x, y : array-like
-        Spatial coordinates in nanometers.
+    x_det, y_det : array-like
+        Channel-local detection coordinates in nanometers.
     ch : array-like or None, optional
-        Channel indices for each event. If None, assumes a single channel.
+        One-based channel indices for each event. If None, assumes one channel.
     channels_crops_pix : int or sequence, optional
         Crop size in pixels. Can be scalar, (h, w), or per-channel.
     channels_pixels_nm : float or sequence, optional
@@ -95,7 +95,7 @@ def crop_individual_extract(
             raise SyntaxError(
                 "Cannot apply crop extracting on several channels without defining channel vector"
             )
-        ch = np.zeros_like(fr, dtype=np.uint8)
+        ch = np.ones_like(fr, dtype=np.uint8)
 
     # Normalize crop sizes per channel
     try:
@@ -134,9 +134,16 @@ def crop_individual_extract(
     # Sorting inputs for efficient grouped processing
     xp = get_xp(cuda)
     fr = xp.asarray(fr, dtype=xp.uint32)
-    y = xp.asarray(y, dtype=xp.float32)
-    x = xp.asarray(x, dtype=xp.float32)
+    y = xp.asarray(y_det, dtype=xp.float32)
+    x = xp.asarray(x_det, dtype=xp.float32)
     ch = xp.asarray(ch, dtype=xp.uint8)
+
+    if len(ch):
+        _ch_min = int(ch.min().get() if hasattr(ch.min(), "get") else ch.min())
+        _ch_max = int(ch.max().get() if hasattr(ch.max(), "get") else ch.max())
+        if _ch_min < 1 or _ch_max > len(channels):
+            raise ValueError("Channel indices must be one-based and within channels.")
+        ch = ch - 1
 
     keys = xp.stack((x, y, fr, ch))
     argsort = xp.lexsort(keys)

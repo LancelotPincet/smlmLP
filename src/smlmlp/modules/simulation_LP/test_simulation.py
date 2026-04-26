@@ -5,21 +5,30 @@
 # GitHub        : https://github.com/LancelotPincet
 # Library       : smlmLP
 # Module        : simulation
-
 """
 This file allows to test simulation
 
 simulation : This module simulates SMLM data.
 """
+
 import pytest
 
 from smlmlp import simulation
 
 
-def test_simulation_is_not_implemented() :
-    """The simulator placeholder raises the standardized error."""
-    with pytest.raises(SyntaxError, match="Not implemented yet") :
+# %% test simulation
+
+
+def test_simulation_raises_not_implemented():
+    """Simulation module raises SyntaxError until implemented."""
+    with pytest.raises(SyntaxError, match="Not implemented yet"):
         simulation()
+
+
+def test_simulation_rejects_unknown_kwargs():
+    """Simulation with unknown parameters still raises not implemented."""
+    with pytest.raises(SyntaxError, match="Not implemented yet"):
+        simulation(nframes=100, unknown_param=True)
 
 
 if __name__ == "__main__":

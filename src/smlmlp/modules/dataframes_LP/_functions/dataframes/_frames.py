@@ -26,7 +26,7 @@ class frames(DataFrame) :
     @column(headers=['nodrift [nm]'], dtype=np.float32, save=False, agg='mean')
     def nodrift(self) :
         """Return a zero drift vector."""
-        return np.zeros(self.nframes, dtype=np.float32)
+        return np.zeros(self.locs.nframes, dtype=np.float32)
 
     @column(headers=['drift x [nm]'], dtype=np.float32, save=False, agg='mean')
     def dx(self) :

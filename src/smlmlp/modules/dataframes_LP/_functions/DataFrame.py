@@ -24,7 +24,7 @@ class DataFrame(BaseDataFrame) :
         """Initialize the object."""
         super().__init__(locs)
         index = np.sort(self.locs.detections[self.index_header].unique())
-        if index[0] == 0 :
+        if len(index) > 0 and index[0] == 0 :
             index = index[1:]
         pd.DataFrame.__init__(self, index=index)
         self.index.name = self.index_header

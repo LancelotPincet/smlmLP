@@ -75,18 +75,13 @@ class column:
             cls.columns_dict = {}
         cls.columns_dict[self.col] = self
 
-        if self.index:
-            if not hasattr(MainDataFrame, "head2save"):
-                MainDataFrame.head2save = []
+        if self.save:
+            save_cls = MainDataFrame if self.index else cls
+            if not hasattr(save_cls, "head2save"):
+                save_cls.head2save = []
             for header in self.headers:
-                if header not in MainDataFrame.head2save:
-                    MainDataFrame.head2save.append(header)
-        else:
-            if not hasattr(cls, "head2save"):
-                cls.head2save = []
-            for header in self.headers:
-                if header not in cls.head2save:
-                    cls.head2save.append(header)
+                if header not in save_cls.head2save:
+                    save_cls.head2save.append(header)
 
         @property
         def _col(instance):
@@ -102,6 +97,7 @@ class column:
             setattr(MainDataFrame, f"{self.col}_mine", False)
             setattr(DataFrame, f"{self.col}_mine", True)
 
+        self._install_dataframe_exists_property()
         self._install_dataframe_merge_property()
 
         if not issubclass(cls, MainDataFrame):
@@ -154,6 +150,9 @@ class column:
         if header_name in df.columns:
             return True
 
+        if header_name == getattr(df, "index_header", None):
+            return True
+
         value = getattr(df, col_name, None)
         if value is None:
             if allow_none:
@@ -175,37 +174,37 @@ class column:
             f"{col_name} not in {getattr(df, 'df_name', df.__class__.__name__)} and cannot be materialized"
         )
 
+    def _series_for_header(self, df, header):
+        """Return a Series for a physical column or dataframe index header."""
+        if header in df.columns:
+            return df[header]
+        if header == getattr(df, "index_header", None):
+            return df.index.to_series(index=df.index)
+        return None
+
     def _aggregate_parent_to_child(self, parent, child, value_header, allow_none=False):
         """
         Aggregate parent[value_header] into child rows by child.index_header,
         aligned explicitly on child.index.
         """
-        if value_header not in parent.columns:
+        value = self._series_for_header(parent, value_header)
+        if value is None:
             if allow_none:
                 return None
             raise ValueError(
                 f"{value_header} not in {child.parent_name} and cannot be merged into {child.df_name}"
             )
 
-        if child.index_header not in parent.columns:
+        group_key = self._series_for_header(parent, child.index_header)
+        if group_key is None:
             if allow_none:
                 return None
             raise ValueError(
                 f"{child.index_header} not in {child.parent_name} and cannot be used to merge {value_header} into {child.df_name}"
             )
 
-        grouped = parent.groupby(child.index_header)[value_header].agg(self.agg)
-        array = grouped.to_numpy()
-
-        try:
-            index_values = getattr(parent, child.index_col)
-        except Exception:
-            index_values = parent[child.index_header]
-
-        if len(index_values) > 0 and min(index_values) == 0:
-            array = array[1:]
-
-        return array
+        grouped = value.groupby(group_key).agg(self.agg)
+        return grouped.reindex(child.index).to_numpy()
 
     def _map_child_to_detections(self, child, value_header, allow_none=False):
         """
@@ -230,9 +229,52 @@ class column:
                 f"{value_header} not in {child.df_name} and cannot be spread into detections"
             )
 
-        return dets[child.index_header].map(child[value_header]).to_numpy()
+        mapped = dets[child.index_header].map(child[value_header])
+        missing = mapped.isna() & dets[child.index_header].notna()
+        missing &= dets[child.index_header] != 0
+        if missing.any():
+            missing_ids = sorted(set(dets.loc[missing, child.index_header].tolist()))
+            if allow_none:
+                return None
+            raise ValueError(
+                f"Missing {child.df_name} rows for {child.index_header} ids {missing_ids}"
+            )
+
+        return mapped.to_numpy()
+
+    def _exists_dataframe(self, df):
+        """Return the dataframe that physically owns this column for exists checks."""
+        locs = getattr(df, "locs", None)
+        df_dict = getattr(locs, "df_dict", None)
+
+        if self.index:
+            if df_dict is not None:
+                return df_dict.get("detections")
+            return getattr(locs, "detections", None)
+
+        if getattr(df, "df_name", None) == self.df_name:
+            return df
+
+        if df_dict is None:
+            return None
+        return df_dict.get(self.df_name)
 
     # Installation methods
+
+    def _install_dataframe_exists_property(self):
+        """Install a passive physical-column existence property on all dataframes."""
+        exists_name = f"{self.col}_exists"
+        if hasattr(MainDataFrame, exists_name) or hasattr(DataFrame, exists_name):
+            raise SyntaxError(f"{exists_name} cannot be defined twice")
+
+        @property
+        def col_exists(df):
+            """Return whether the owning dataframe physically contains the header."""
+            exists_df = self._exists_dataframe(df)
+            return exists_df is not None and self.header in exists_df.columns
+
+        setattr(MainDataFrame, exists_name, col_exists)
+        setattr(DataFrame, exists_name, col_exists)
 
     def _install_dataframe_merge_property(self):
         """

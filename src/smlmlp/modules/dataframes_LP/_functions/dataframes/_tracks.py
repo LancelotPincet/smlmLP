@@ -18,4 +18,4 @@ class tracks(DataFrame) :
         """Associate consecutive frames into track identifiers."""
         from smlmlp import associate_consecutive_frames
 
-        return associate_consecutive_frames(association_radius_nm=self.config.track_association_radius_nm, z=None, locs=self.locs)[0]
+        return associate_consecutive_frames(association_radius_nm=self.locs.config.track_association_radius_nm, z=None, locs=self.locs)[0]

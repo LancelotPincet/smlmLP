@@ -16,7 +16,7 @@ class voxels(DataFrame) :
     @column(headers=['voxel'], dtype=np.uint64, save=True, agg='min', index="points")
     def vox(self) :
         """Assign voxel identifiers."""
-        return np.round(self.z / self.z_pixel) * (self.y_shape * self.x_shape) + np.round(self.y / self.y_pixel) * self.x_shape + np.round(self.x / self.x_pixel)
+        return self.fr * (self.y_shape * self.x_shape) + np.round(self.y / self.y_pixel) * self.x_shape + np.round(self.x / self.x_pixel)
 
 
 

@@ -45,20 +45,34 @@ class detections(MainDataFrame) :
     def x_det(self) :
         """Return channel-local x detection coordinates."""
         if self.x_globdet is None or self.y_globdet is None : return None
-        if self.config.nchannels == 1 : return "x_globdet"
+        if self.locs.config.nchannels == 1 : return "x_globdet"
         from smlmlp import inv_transform_locs
 
-        self.x_det, self.y_det, _ = inv_transform_locs(locs=self.locs)
+        self.x_det, self.y_det, _ = inv_transform_locs(
+            self.x_globdet,
+            self.y_globdet,
+            self.ch,
+            self.locs.config.channels_locs_transform_matrices,
+            cuda=self.locs.config.cuda,
+            parallel=self.locs.config.parallel,
+        )
         return "x_det"
 
     @column(headers=['y detection [nm]'], dtype=np.float32, save=True, agg='mean')
     def y_det(self) :
         """Return channel-local y detection coordinates."""
         if self.x_globdet is None or self.y_globdet is None : return None
-        if self.config.nchannels == 1 : return "y_globdet"
+        if self.locs.config.nchannels == 1 : return "y_globdet"
         from smlmlp import inv_transform_locs
 
-        self.x_det, self.y_det, _ = inv_transform_locs(locs=self.locs)
+        self.x_det, self.y_det, _ = inv_transform_locs(
+            self.x_globdet,
+            self.y_globdet,
+            self.ch,
+            self.locs.config.channels_locs_transform_matrices,
+            cuda=self.locs.config.cuda,
+            parallel=self.locs.config.parallel,
+        )
         return "y_det"
 
 
@@ -79,20 +93,34 @@ class detections(MainDataFrame) :
     def x_globfit(self) :
         """Return global x fit coordinates."""
         if self.x_fit is None or self.y_fit is None : return None
-        if self.config.nchannels == 1 : return "x_fit"
+        if self.locs.config.nchannels == 1 : return "x_fit"
         from smlmlp import transform_locs
 
-        self.x_globfit, self.y_globfit, _ = transform_locs(locs=self.locs)
+        self.x_globfit, self.y_globfit, _ = transform_locs(
+            self.x_fit,
+            self.y_fit,
+            self.ch,
+            self.locs.config.channels_locs_transform_matrices,
+            cuda=self.locs.config.cuda,
+            parallel=self.locs.config.parallel,
+        )
         return "x_globfit"
 
     @column(headers=['y global fit [nm]'], dtype=np.float32, save=True, agg='mean')
     def y_globfit(self) :
         """Return global y fit coordinates."""
         if self.x_fit is None or self.y_fit is None : return None
-        if self.config.nchannels == 1 : return "y_fit"
+        if self.locs.config.nchannels == 1 : return "y_fit"
         from smlmlp import transform_locs
 
-        self.x_globfit, self.y_globfit, _ = transform_locs(locs=self.locs)
+        self.x_globfit, self.y_globfit, _ = transform_locs(
+            self.x_fit,
+            self.y_fit,
+            self.ch,
+            self.locs.config.channels_locs_transform_matrices,
+            cuda=self.locs.config.cuda,
+            parallel=self.locs.config.parallel,
+        )
         return "y_globfit"
 
     @column(headers=['z fit [nm]'], dtype=np.float32, save=True, agg='mean')
@@ -206,8 +234,8 @@ class detections(MainDataFrame) :
 
     @column(headers=['intensity [photon]', 'phot'], dtype=np.float32, save=True, agg='mean')
     def intensity(self) :
-        """Alias intensity to Gaussian signal."""
-        return "gaussian_signal"
+        """Alias intensity to Gaussian intensity."""
+        return "gaussian_intensity"
 
     @column(headers=['snr'], dtype=np.float32, save=False, agg='mean')
     def snr(self) :
@@ -234,7 +262,7 @@ class detections(MainDataFrame) :
     # Gaussians
 
     @column(headers=['gaussian intensity [photon]'], dtype=np.float32, save=False, agg='mean')
-    def gaussian_signal(self) :
+    def gaussian_intensity(self) :
         """Compute Gaussian integrated signal."""
         return self.amp * 2 * np.pi * (self.sigma_x / self.x_pixel) * (self.sigma_y / self.y_pixel)
 
@@ -242,33 +270,54 @@ class detections(MainDataFrame) :
     def sigma(self) :
         """Compute effective Gaussian sigma."""
         if self.locs.config.model not in ['isogaussian', 'gaussian'] :
-            return np.sqrt(self.nphotons / 2 / np.pi / self.amp)
-        return np.sqrt(self.sigma_x * self.sigma_y)
+            if self.intensity_exists and self.amp_exists :
+                return np.sqrt(self.intensity / 2 / np.pi / self.amp)
+            return None
+        if self.sigma_x_exists and self.sigma_y_exists :
+            return np.sqrt(self.sigma_x * self.sigma_y)
+        if self.sigma_x_fit_exists and self.sigma_y_fit_exists :
+            return np.sqrt(self.sigma_x_fit * self.sigma_y_fit)
+        if self.sigma_fit_exists :
+            return "sigma_fit"
+        return None
 
     @column(headers=['gaussian sigma x [nm]'], dtype=np.float32, save=True, agg='mean')
     def sigma_x(self) :
         """Alias Gaussian x sigma to fitted x sigma."""
-        return "sigma_x_fit"
+        if self.sigma_x_fit_exists : return "sigma_x_fit"
+        if self.sigma_fit_exists : return "sigma_fit"
+        if self.sigma_exists : return "sigma"
+        return None
 
     @column(headers=['gaussian sigma y [nm]'], dtype=np.float32, save=True, agg='mean')
     def sigma_y(self) :
         """Alias Gaussian y sigma to fitted y sigma."""
-        return "sigma_y_fit"
+        if self.sigma_y_fit_exists : return "sigma_y_fit"
+        if self.sigma_fit_exists : return "sigma_fit"
+        if self.sigma_exists : return "sigma"
+        return None
 
     @column(headers=['gaussian sigma fit [nm]', 'sigma [nm]'], dtype=np.float32, save=True, agg='mean')
     def sigma_fit(self) :
         """Alias fitted Gaussian sigma to sigma."""
-        return "sigma"
+        if self.sigma_exists : return "sigma"
+        if self.sigma_x_fit_exists and self.sigma_y_fit_exists :
+            return np.sqrt(self.sigma_x_fit * self.sigma_y_fit)
+        return None
 
     @column(headers=['gaussian sigma x fit [nm]', 'sigma x [nm]', 'sigma_x [nm]', 'PSFxnm'], dtype=np.float32, save=True, agg='mean')
     def sigma_x_fit(self) :
         """Alias fitted x sigma to fitted sigma."""
-        return "sigma_fit"
+        if self.sigma_fit_exists : return "sigma_fit"
+        if self.sigma_exists : return "sigma"
+        return None
 
     @column(headers=['gaussian sigma y fit [nm]', 'sigma y [nm]', 'sigma_y [nm]', 'PSFynm'], dtype=np.float32, save=True, agg='mean')
     def sigma_y_fit(self) :
         """Alias fitted y sigma to fitted sigma."""
-        return "sigma_fit"
+        if self.sigma_fit_exists : return "sigma_fit"
+        if self.sigma_exists : return "sigma"
+        return None
 
     @column(headers=['sigma ratio', 'ellipticity'], dtype=np.float32, save=False, agg='mean')
     def sigma_ratio(self) :
@@ -284,6 +333,11 @@ class detections(MainDataFrame) :
 
     # CRLB
 
+    @column(headers=['image sigma [nm]'], dtype=np.float32, save=False, agg='mean')
+    def image_sigma(self) :
+        """Sigma used to construct image"""
+        return "crlb"
+
     @column(headers=['crlb xy [nm]', 'uncertainty_xy', 'uncertainty_xy [nm]'], dtype=np.float32, save=False, agg='mean')
     def crlb(self) :
         """Combine x and y CRLB values."""
@@ -297,14 +351,14 @@ class detections(MainDataFrame) :
         pixel2 = self.x_pixel**2
         effective_width = sig**2 + pixel2 / 12
         noise2 = self.os + self.read_noise**2
-        tau = 2 * np.pi * noise2 * effective_width / pixel2 / self.signal
+        tau = 2 * np.pi * noise2 * effective_width / pixel2 / self.intensity
         if self.locs.config.estimator == 'mle' and self.locs.config.distribution == 'poisson':
             correction = (1 + 4 * tau + np.sqrt(2 * tau / (1 + 4 * tau)))
         elif self.locs.config.estimator == 'lse' or (self.locs.config.estimator == 'mle' and self.locs.config.distribution == 'normal') :
             correction = (4 * tau + 16 / 9)
         else :
             raise ValueError('Fitting config not recognized')
-        return np.sqrt( effective_width / self.signal * correction )
+        return np.sqrt( effective_width / self.intensity * correction )
 
     @column(headers=['crlb y [nm]', 'uncertainty_y', 'uncertainty_y [nm]'], dtype=np.float32, save=False, agg='mean')
     def crlb_y(self) :
@@ -314,14 +368,14 @@ class detections(MainDataFrame) :
         pixel2 = self.y_pixel**2
         effective_width = sig**2 + pixel2 / 12
         noise2 = self.os + self.read_noise**2
-        tau = 2 * np.pi * noise2 * effective_width / pixel2 / self.signal
+        tau = 2 * np.pi * noise2 * effective_width / pixel2 / self.intensity
         if self.locs.config.estimator == 'mle' and self.locs.config.distribution == 'poisson':
             correction = (1 + 4 * tau + np.sqrt(2 * tau / (1 + 4 * tau)))
         elif self.locs.config.estimator == 'lse' or (self.locs.config.estimator == 'mle' and self.locs.config.distribution == 'normal') :
             correction = (4 * tau + 16 / 9)
         else :
             raise ValueError('Fitting config not recognized')
-        return np.sqrt( effective_width / self.signal * correction )
+        return np.sqrt( effective_width / self.intensity * correction )
 
 
 
@@ -330,7 +384,7 @@ class detections(MainDataFrame) :
     @column(headers=[f'no zernike'], dtype=np.float32, save=False, agg='mean')
     def nozernike(self) :
         """Return a zero Zernike aberration column."""
-        return np.zeros(self.ndetections, dtype=np.float32)
+        return np.zeros(self.locs.ndetections, dtype=np.float32)
 
     @property
     def nzernike(self) :
@@ -343,11 +397,20 @@ class detections(MainDataFrame) :
         self._nzernike = int(value)
         cls = self.__class__
         for i in range(1, int(value) +1) :
-            @column(headers=[f'zernike {i:02}'], dtype=np.float32, save=True, agg='mean')
+            col_name = f'zernike_{i:02}'
+            if col_name in getattr(cls, "columns_dict", {}) :
+                continue
+
             def zernike(self) :
                 """Alias a dynamic Zernike column to zero aberration."""
                 return "nozernike"
-            setattr(cls, f'zernike_{i:02}', zernike)
+            zernike.__name__ = col_name
+
+            zernike = column(
+                headers=[f'zernike {i:02}'], dtype=np.float32, save=True, agg='mean'
+            )(zernike)
+            setattr(cls, col_name, zernike)
+            zernike.__set_name__(cls, col_name)
 
 
 

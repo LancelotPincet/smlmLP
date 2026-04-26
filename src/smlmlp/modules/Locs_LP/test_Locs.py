@@ -77,6 +77,22 @@ def test_locs_filter_returns_filtered_locs() :
     assert "filter" not in filtered.detections.columns
 
 
+def test_locs_filter_uses_physical_index_columns_for_children() :
+    """Filtering child dataframes uses physical ids without lazy columns."""
+    detections = pd.DataFrame(
+        {"frame": [1, 2], "channel": [1, 2], "filter": [True, True]}
+    )
+    frames = pd.DataFrame(index=pd.Index([1, 2], name="frame"))
+    locs = Locs([detections, frames])
+    locs.config.cameras[0].nchannels = 2
+
+    filtered = locs.filter(mask=np.array([True, False]))
+
+    assert len(filtered.detections) == 1
+    assert filtered.frames.index.tolist() == [1]
+    assert "filter" not in filtered.detections.columns
+
+
 def test_locs_combine_adds_channel_labels() :
     """Combining localization sets concatenates detections and labels sources."""
     first = Locs()

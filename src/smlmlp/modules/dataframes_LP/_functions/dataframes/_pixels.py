@@ -27,14 +27,14 @@ class pixels(DataFrame) :
         """Sample the wide-field image at localization positions."""
         from smlmlp import image_picker
 
-        return image_picker(self.config.wf_image, locs=self.locs)[0]
+        return image_picker(self.locs.config.wf_image, locs=self.locs)[0]
 
     @column(headers=['irradiance [photon.pix-2]'], dtype=np.float32, save=True, agg='mean')
     def irradiance(self) :
         """Sample irradiance image or fall back to offset values."""
-        if self.config.irradiance_image is not None :
+        if self.locs.config.irradiance_image is not None :
             from smlmlp import image_picker
 
-            return image_picker(self.config.irradiance_image, locs=self.locs)[0]
+            return image_picker(self.locs.config.irradiance_image, locs=self.locs)[0]
         return "os"
 

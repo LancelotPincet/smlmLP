@@ -74,7 +74,7 @@ class Config() :
                         data = {}
                         for file in config_folder.glob('*.npy') :
                             key = file.stem
-                            data[key] = np.load(file, allow_pickle=True)
+                            data[key] = array_convert(np.load(file, allow_pickle=True))
                         config["Data"] = data
                 else :
                     raise SyntaxError(f'config path was not recognized: {config}')
@@ -122,7 +122,7 @@ class Config() :
             json.dump(metadata, json_file, indent=4)
         config_folder = folder(path.parent / "_config_data", warning=False)
         for key, value in data.items() :
-            np.save(config_folder / f"{key}.npy", np.array(value, dtype=object))
+            np.save(config_folder / f"{key}.npy", array_convert(value))
 
 
     # Cameras
@@ -681,6 +681,16 @@ class Config() :
         """Return iflim y channels."""
         return [self.nchannels]
 
+    @metadatum('Ratio')
+    def dpflim_x_channels(self) : # nm
+        """Return dpflim x channels."""
+        return [idx for idx in range(1, self.nchannels)] if self.nchannels > 1 else [self.nchannels]
+
+    @metadatum('Ratio')
+    def dpflim_y_channels(self) : # nm
+        """Return dpflim y channels."""
+        return [self.nchannels]
+
 
 
     # Modloc
@@ -1016,6 +1026,25 @@ for data in Channel.properties :
         for channel, v in zip(self.channels, value) :
             setattr(channel, data, v)
     setattr(Config, f'channels_{datas}', channel_property)
+
+def array_convert(value) :
+    """Convert array-like data while preserving numeric dtypes when possible."""
+    try :
+        array = np.asarray(value)
+    except ValueError :
+        return np.array(value, dtype=object)
+    if array.dtype != object :
+        return array
+    try :
+        typed_array = np.asarray(array.tolist())
+    except ValueError :
+        return array
+    if np.issubdtype(typed_array.dtype, np.number) or np.issubdtype(
+        typed_array.dtype, np.bool_
+    ) :
+        return typed_array
+    return array
+
 
 def json_convert(value) :
     """Convert numpy and container values to JSON-serializable objects."""

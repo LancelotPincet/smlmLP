@@ -18,7 +18,7 @@ class blinks(DataFrame) :
         """Associate points across consecutive frames into blinks."""
         from smlmlp import associate_consecutive_frames
 
-        return associate_consecutive_frames(association_radius_nm=self.config.blink_association_radius_nm, z_association_radius_nm=self.config.blink_z_association_radius_nm, locs=self.locs)[0]
+        return associate_consecutive_frames(association_radius_nm=self.locs.config.blink_association_radius_nm, z_association_radius_nm=self.locs.config.blink_z_association_radius_nm, locs=self.locs)[0]
 
 
     # Photophysics

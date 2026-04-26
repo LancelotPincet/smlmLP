@@ -21,7 +21,10 @@ class points(DataFrame) :
         else :
             from smlmlp import associate_different_channels
 
-            return associate_different_channels(association_radius_nm=self.locs.config.channel_association_radius_nm, locs=self.locs)[0]
+            dets = self.locs.detections
+            if dets.x_globfit is None or dets.y_globfit is None :
+                return None
+            return associate_different_channels(locs=self.locs)[0]
     
 
 
@@ -30,19 +33,19 @@ class points(DataFrame) :
     @column(headers=['x stable [nm]'], dtype=np.float32, save=True, agg='mean')
     def xx(self) :
         """Return drift-corrected x coordinates."""
-        if self.dx is None : return "x"
+        if not self.dx_exists : return "x"
         return self.x - self.dx
 
     @column(headers=['y stable [nm]'], dtype=np.float32, save=True, agg='mean')
     def yy(self) :
         """Return drift-corrected y coordinates."""
-        if self.dy is None : return "y"
+        if not self.dy_exists : return "y"
         return self.y - self.dy
 
     @column(headers=['z stable [nm]'], dtype=np.float32, save=True, agg='mean')
     def zz(self) :
         """Return drift-corrected z coordinates."""
-        if self.dz is None : return "z"
+        if not self.dz_exists : return "z"
         return self.z - self.dz
 
 
@@ -306,7 +309,7 @@ class points(DataFrame) :
         """Aggregate spectral x-channel intensity."""
         from smlmlp import aggregate_ratio
 
-        self.spectral_x, self.spectral_y, _ = aggregate_ratio(self.intensity, x_channels=self.spectral_x_channels, y_channels=self.spectral_y_channels, locs=self.locs)
+        self.spectral_x, self.spectral_y, _ = aggregate_ratio(self.intensity, x_channels=self.locs.config.spectral_x_channels, y_channels=self.locs.config.spectral_y_channels, locs=self.locs)
         return "spectral_x"
 
     @column(headers=['spectral y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
@@ -314,7 +317,7 @@ class points(DataFrame) :
         """Aggregate spectral y-channel intensity."""
         from smlmlp import aggregate_ratio
 
-        self.spectral_x, self.spectral_y, _ = aggregate_ratio(self.intensity, x_channels=self.spectral_x_channels, y_channels=self.spectral_y_channels, locs=self.locs)
+        self.spectral_x, self.spectral_y, _ = aggregate_ratio(self.intensity, x_channels=self.locs.config.spectral_x_channels, y_channels=self.locs.config.spectral_y_channels, locs=self.locs)
         return "spectral_y"
 
 
@@ -331,7 +334,7 @@ class points(DataFrame) :
         """Aggregate biplane x-channel width."""
         from smlmlp import aggregate_ratio
 
-        self.biplane_x, self.biplane_y, _ = aggregate_ratio(self.sigma, x_channels=self.biplane_x_channels, y_channels=self.biplane_y_channels, locs=self.locs)
+        self.biplane_x, self.biplane_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.biplane_x_channels, y_channels=self.locs.config.biplane_y_channels, locs=self.locs)
         return "biplane_x"
 
     @column(headers=['biplane y width [nm]'], dtype=np.float32, save=True, agg='mean')
@@ -339,7 +342,7 @@ class points(DataFrame) :
         """Aggregate biplane y-channel width."""
         from smlmlp import aggregate_ratio
 
-        self.biplane_x, self.biplane_y, _ = aggregate_ratio(self.sigma, x_channels=self.biplane_x_channels, y_channels=self.biplane_y_channels, locs=self.locs)
+        self.biplane_x, self.biplane_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.biplane_x_channels, y_channels=self.locs.config.biplane_y_channels, locs=self.locs)
         return "biplane_y"
 
 
@@ -356,7 +359,7 @@ class points(DataFrame) :
         """Aggregate DONALD x-channel value."""
         from smlmlp import aggregate_ratio
 
-        self.donald_x, self.donald_y, _ = aggregate_ratio(self.sigma, x_channels=self.donald_x_channels, y_channels=self.donald_y_channels, locs=self.locs)
+        self.donald_x, self.donald_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.donald_x_channels, y_channels=self.locs.config.donald_y_channels, locs=self.locs)
         return "donald_x"
 
     @column(headers=['donald y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
@@ -364,7 +367,7 @@ class points(DataFrame) :
         """Aggregate DONALD y-channel value."""
         from smlmlp import aggregate_ratio
 
-        self.donald_x, self.donald_y, _ = aggregate_ratio(self.sigma, x_channels=self.donald_x_channels, y_channels=self.donald_y_channels, locs=self.locs)
+        self.donald_x, self.donald_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.donald_x_channels, y_channels=self.locs.config.donald_y_channels, locs=self.locs)
         return "donald_y"
 
 
@@ -381,7 +384,7 @@ class points(DataFrame) :
         """Aggregate IFLIM x-channel value."""
         from smlmlp import aggregate_ratio
 
-        self.iflim_x, self.iflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.iflim_x_channels, y_channels=self.iflim_y_channels, locs=self.locs)
+        self.iflim_x, self.iflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.iflim_x_channels, y_channels=self.locs.config.iflim_y_channels, locs=self.locs)
         return "iflim_x"
 
     @column(headers=['iflim y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
@@ -389,7 +392,7 @@ class points(DataFrame) :
         """Aggregate IFLIM y-channel value."""
         from smlmlp import aggregate_ratio
 
-        self.iflim_x, self.iflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.iflim_x_channels, y_channels=self.iflim_y_channels, locs=self.locs)
+        self.iflim_x, self.iflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.iflim_x_channels, y_channels=self.locs.config.iflim_y_channels, locs=self.locs)
         return "iflim_y"
 
 
@@ -406,7 +409,7 @@ class points(DataFrame) :
         """Aggregate DPFLIM x-channel value."""
         from smlmlp import aggregate_ratio
 
-        self.dpflim_x, self.dpflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.dpflim_x_channels, y_channels=self.dpflim_y_channels, locs=self.locs)
+        self.dpflim_x, self.dpflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.dpflim_x_channels, y_channels=self.locs.config.dpflim_y_channels, locs=self.locs)
         return "dpflim_x"
 
     @column(headers=['dpflim y intensity [photon]'], dtype=np.float32, save=True, agg='mean')
@@ -414,5 +417,5 @@ class points(DataFrame) :
         """Aggregate DPFLIM y-channel value."""
         from smlmlp import aggregate_ratio
 
-        self.dpflim_x, self.dpflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.dpflim_x_channels, y_channels=self.dpflim_y_channels, locs=self.locs)
+        self.dpflim_x, self.dpflim_y, _ = aggregate_ratio(self.sigma, x_channels=self.locs.config.dpflim_x_channels, y_channels=self.locs.config.dpflim_y_channels, locs=self.locs)
         return "dpflim_y"

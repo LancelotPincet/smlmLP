@@ -200,7 +200,7 @@ def detect_spatial_maxima(
         y *= pixel[0]
         x *= pixel[1]
 
-        c = np.full_like(fr, fill_value=pos, dtype=np.uint8)
+        c = np.full_like(fr, fill_value=pos + 1, dtype=np.uint8)
         argsort = np.lexsort((x, y, fr))
 
         F.append(fr[argsort])

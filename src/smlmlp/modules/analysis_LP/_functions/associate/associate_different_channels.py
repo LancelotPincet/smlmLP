@@ -16,8 +16,8 @@ from smlmlp import analysis
 
 @analysis(df_name="detections")
 def associate_different_channels(
-    x,
-    y,
+    x_globfit,
+    y_globfit,
     fr,
     ch,
     association_radius_nm=30.0,
@@ -30,7 +30,7 @@ def associate_different_channels(
 
     Parameters
     ----------
-    x, y : array-like
+    x_globfit, y_globfit : array-like
         Localization coordinates.
     fr : array-like
         Frame identifiers.
@@ -51,7 +51,7 @@ def associate_different_channels(
         Diagnostics.
     """
 
-    if parallel is False or parallel == 1:
+    if parallel is False or parallel == 0 or parallel == 1:
         n_jobs = 1
     elif parallel is True or parallel == -1:
         n_jobs = max(1, (os.cpu_count() or 2) - 1)
@@ -60,8 +60,8 @@ def associate_different_channels(
     else:
         raise ValueError("Invalid value for 'parallel'")
 
-    x = np.asarray(x, dtype=np.float32)
-    y = np.asarray(y, dtype=np.float32)
+    x = np.asarray(x_globfit, dtype=np.float32)
+    y = np.asarray(y_globfit, dtype=np.float32)
     fr = np.asarray(fr, dtype=np.uint32)
     ch = np.asarray(ch, dtype=np.uint8)
 
