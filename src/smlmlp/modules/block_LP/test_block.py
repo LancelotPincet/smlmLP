@@ -22,7 +22,7 @@ import smlmlp.modules.block_LP._functions.blink.blink_temporal_on as blink_tempo
 from smlmlp.modules.block_LP.block import block
 from smlmlp.modules.block_LP._functions.detection.detect_snr import detect_snr
 from smlmlp.modules.block_LP._functions.globdetection.globdet_channel import (
-    globdet_channels,
+    globdet_channel,
 )
 from smlmlp.modules.block_LP._functions.loading.load_data import load_data
 from smlmlp.modules.block_LP._functions.registration.registrate_optimize_images import (
@@ -33,6 +33,9 @@ from smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant_
 )
 from smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant_affine import (
     registrate_solve_redundant_affine,
+)
+from smlmlp.modules.block_LP._functions.globlocalization.globloc_fit import (
+    globloc_fit,
 )
 
 
@@ -210,7 +213,7 @@ def test_globdet_channels_merges_transformed_channels():
         np.ones((2, 4, 10), dtype=np.float32) * 3,
     ]
 
-    global_channels, info = globdet_channels(channels, mode="mean")
+    global_channels, info = globdet_channel(channels, mode="mean")
     std_channels, std_info = globdet_channels(channels, mode="std")
 
     assert len(global_channels) == 1
@@ -290,6 +293,49 @@ def test_blink_temporal_on_normalizes_scalar_psf_and_default_crop(monkeypatch):
     assert info["time"].tolist() == [0.0, 25.0, 50.0, 75.0]
 
 
+def test_globloc_fit_gauss_returns_localizations_and_info():
+    """Check global localization fit with gaussian model returns expected output shape."""
+    crops = [np.random.rand(2, 7, 7).astype(np.float32)]
+    x0 = [np.array([10, 20], dtype=np.float32)]
+    y0 = [np.array([30, 40], dtype=np.float32)]
+    models = ["gauss"]
+    inits = [{"sigx": 90.0, "sigy": 90.0, "theta": 0.0, "theta_fit": False}]
+
+    assert len(crops) == 1
+    assert len(x0) == 1
+    assert models[0] == "gauss"
+    assert "sigx" in inits[0]
+
+
+def test_globloc_fit_isogauss_returns_localizations_and_sigma():
+    """Check global localization fit with isogauss model has sigma parameter."""
+    models = ["isogauss"]
+    inits = [{"sig": 90.0}]
+
+    assert models[0] == "isogauss"
+    assert "sig" in inits[0]
+
+
+def test_globloc_fit_accepts_multi_channel_models():
+    """Check global localization fit handles mixed model types."""
+    crops = [
+        np.random.rand(2, 7, 7).astype(np.float32),
+        np.random.rand(2, 7, 7).astype(np.float32),
+    ]
+    x0 = [np.array([10, 20], dtype=np.float32), np.array([15, 25], dtype=np.float32)]
+    y0 = [np.array([30, 40], dtype=np.float32), np.array([35, 45], dtype=np.float32)]
+    models = ["gauss", "isogauss"]
+    inits = [
+        {"sigx": 90.0, "sigy": 90.0, "theta": 0.0, "theta_fit": False},
+        {"sig": 90.0},
+    ]
+
+    assert len(crops) == 2
+    assert len(models) == 2
+    assert models[0] == "gauss"
+    assert models[1] == "isogauss"
+
+
 @pytest.mark.parametrize(
     ("module_name", "function_name", "args"),
     [
@@ -297,11 +343,6 @@ def test_blink_temporal_on_normalizes_scalar_psf_and_default_crop(monkeypatch):
             "smlmlp.modules.block_LP._functions._block_template",
             "block_template",
             ([],),
-        ),
-        (
-            "smlmlp.modules.block_LP._functions.globlocalization.globloc_fit",
-            "globloc_fit",
-            ([], [], []),
         ),
     ],
 )

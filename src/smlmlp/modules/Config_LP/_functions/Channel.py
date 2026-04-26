@@ -26,6 +26,9 @@ class Channel :
         ("psf_xtangents", "Data"),
         ("psf_ytangents", "Data"),
         ("psf_spline_coeffs", "Data"),
+        ("fit_theta", "Fit"),
+        ("fit_model", "Fit"),
+        ("fit_init", "Fit"),
         ("x_shift_nm", "Registration"),
         ("y_shift_nm", "Registration"),
         ("rotation_deg", "Registration"),
@@ -90,10 +93,6 @@ class Channel :
     @prop()
     def psf_theta_deg(self) : # [°]
         """Return psf theta deg."""
-        return 0.
-    @prop()
-    def channels_fit_theta(self) : # [°]
-        """Return channels fit theta."""
         return 0.
 
     @property
@@ -232,6 +231,44 @@ class Channel :
         h = crop_nm / self.pixel_nm[0]
         w = crop_nm / self.pixel_nm[1]
         return int(2*(h//2)+1), int(2*(w//2)+1)
+
+
+
+    # Fit
+
+    @prop()
+    def fit_theta(self) : # bool
+        """Return channels fit theta."""
+        return False
+
+    @prop()
+    def fit_model(self) : # bool
+        """Return channels fit model."""
+        return "isogauss"
+    @fit_model.setter
+    def fit_model(self, value) :
+        if value not in ['isogauss', 'gauss', 'spline'] :
+            raise ValueError(f'{value} fitting model not recognized')
+        self._fit_model = str(value).lower()
+
+    @prop()
+    def fit_init(self) : # bool
+        """Return channels fit initial values."""
+        match self.fit_model :
+            case "isogauss" :
+                return {"sig": self.psf_sigmas_nm}
+            case "gauss" :
+                return {"sigx": self.psf_xsigma_nm, "sigy": self.psf_ysigma_nm, "theta": self.psf_theta_deg, "theta_fit": self.fit_theta}
+            case "spline" :
+                return {"tx": self.psf_xtangent, "ty": self.psf_ytangent, "tz": self.psf_ztangent, "coeffs": self.psf_coeff}
+            case _ :
+                raise ValueError(f'{self.fit_model} fitting model not recognized')
+    @fit_init.setter
+    def fit_init(self, value) :
+        init = self.fit_init
+        if any([key not in init for key in value.keys()]) : raise KeyError('input fit initialization unvalid')
+        init.update(value)
+        self._fit_init = init
 
 
 

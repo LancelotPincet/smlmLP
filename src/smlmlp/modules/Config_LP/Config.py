@@ -171,6 +171,14 @@ class Config() :
         """Return channels shapes."""
         return [(bb[3]-bb[1], bb[2]-bb[0]) for bboxes in self.cameras_bbox for bb in bboxes]
 
+    @property
+    def glob_pixel_nm(self) :
+        """Return glob pixel nm."""
+        return (
+            min([pix[0] for pix in self.channels_pixels_nm]),
+            min([pix[1] for pix in self.channels_pixels_nm]),
+        )
+
 
     # Loads
 

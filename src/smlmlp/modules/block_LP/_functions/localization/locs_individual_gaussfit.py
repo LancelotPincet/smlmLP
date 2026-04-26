@@ -31,8 +31,8 @@ def locs_individual_gaussfit(
     parallel=False,
     channels_psf_xsigmas_nm=SIGMA,
     channels_psf_ysigmas_nm=SIGMA,
-    channels_psf_theta_deg=0.0,
-    channels_fit_theta=0.0,
+    channels_psf_thetas_deg=0.0,
+    channels_fit_thetas=True,
 ):
     """
     Fit each crop independently with an anisotropic 2D Gaussian model.
