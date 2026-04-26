@@ -23,7 +23,7 @@ from smlmlp.modules.analysis_LP._functions.aggregate.aggregate_flux import aggre
 from smlmlp.modules.analysis_LP._functions.aggregate.aggregate_ratio import aggregate_ratio
 from smlmlp.modules.analysis_LP._functions.lost.lost_channels import lost_channels
 from smlmlp.modules.analysis_LP._functions.lost.lost_frames import lost_frames
-from smlmlp.modules.analysis_LP._functions.transform.inv_transform_loc import inv_transform_locs
+from smlmlp.modules.analysis_LP._functions.transform.inv_transform_locs import inv_transform_locs
 from smlmlp.modules.analysis_LP._functions.transform.transform_locs import transform_locs
 
 
@@ -35,7 +35,7 @@ PLACEHOLDERS = [
     ("smlmlp.modules.analysis_LP._functions.calibration.calibration_flim", "calibration_flim"),
     ("smlmlp.modules.analysis_LP._functions.calibration.calibration_fuse", "calibration_fuse"),
     ("smlmlp.modules.analysis_LP._functions.calibration.calibration_spheres", "calibration_spheres"),
-    ("smlmlp.modules.analysis_LP._functions.calibration.calibration_zstacks", "calibration_zstack"),
+    ("smlmlp.modules.analysis_LP._functions.calibration.calibration_zstacks", "calibration_zstacks"),
     ("smlmlp.modules.analysis_LP._functions.clustering.clustering_dbscan", "clustering_dbscan"),
     ("smlmlp.modules.analysis_LP._functions.demix.demix_histogram", "demix_histogram"),
     ("smlmlp.modules.analysis_LP._functions.drift.drift_aim", "drift_aim"),
@@ -186,3 +186,7 @@ def test_unimplemented_placeholders_raise_syntax_error(module_name, function_nam
 
     with pytest.raises(SyntaxError, match="Not implemented yet"):
         function(*args, **kwargs)
+
+if __name__ == "__main__" :
+    from corelp import test
+    test(__file__)

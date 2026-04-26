@@ -214,7 +214,7 @@ def test_globdet_channels_merges_transformed_channels():
     ]
 
     global_channels, info = globdet_channel(channels, mode="mean")
-    std_channels, std_info = globdet_channels(channels, mode="std")
+    std_channels, std_info = globdet_channel(channels, mode="std")
 
     assert len(global_channels) == 1
     assert len(std_channels) == 1
@@ -227,10 +227,10 @@ def test_globdet_channels_merges_transformed_channels():
     assert info["crop_shape"] == (4, 8)
 
     out = [np.empty_like(global_channels[0])]
-    reused_channels, _ = globdet_channels(channels, mode="mean", global_channels=out)
+    reused_channels, _ = globdet_channel(channels, mode="mean", global_channels=out)
     assert reused_channels[0] is out[0]
 
-    shifted_channels, shifted_info = globdet_channels(
+    shifted_channels, shifted_info = globdet_channel(
         channels,
         channels_x_shifts_nm=[1.0, 0.0],
     )
