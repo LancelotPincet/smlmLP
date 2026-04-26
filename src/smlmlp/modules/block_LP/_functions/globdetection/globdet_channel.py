@@ -10,7 +10,7 @@ import numpy as np
 
 
 @block()
-def globdet_channels(
+def globdet_channel(
     channels,
     /,
     mode="mean",

@@ -1,4 +1,5 @@
 smlmlp.computer module
 ======================
 
-.. autofunction:: smlmlp.computer
+.. autodata:: smlmlp.computer
+   :no-value:

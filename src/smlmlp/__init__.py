@@ -34,7 +34,7 @@ sources = {
 'associate_density': 'smlmlp.modules.analysis_LP._functions.associate.associate_density',
 'associate_consecutive_frames_radius': 'smlmlp.modules.analysis_LP._functions.associate.associate_consecutive_frames_radius',
 'transform_locs': 'smlmlp.modules.analysis_LP._functions.transform.transform_locs',
-'inv_transform_loc': 'smlmlp.modules.analysis_LP._functions.transform.inv_transform_loc',
+'inv_transform_locs': 'smlmlp.modules.analysis_LP._functions.transform.inv_transform_locs',
 'metric_frc': 'smlmlp.modules.analysis_LP._functions.metric.metric_frc',
 'metric_squirrel': 'smlmlp.modules.analysis_LP._functions.metric.metric_squirrel',
 'metric_nena': 'smlmlp.modules.analysis_LP._functions.metric.metric_nena',
