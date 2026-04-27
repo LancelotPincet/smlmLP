@@ -401,17 +401,6 @@ class Config() :
         assert value.lower() in ["poisson", "normal"]
         self._distribution = value.lower()
 
-    @metadatum('Localizations')
-    def model(self) : # string
-        """Return model."""
-        return "isogaussian"
-    @model.setter
-    def model(self, value) :
-        """Set model."""
-        assert type(value) is str
-        assert value.lower() in ["isogaussian", "gaussian", "spline"]
-        self._model = value.lower()
-
 
 
     # Effective values
@@ -614,12 +603,12 @@ class Config() :
 
     # Association
 
-    @metadatum('Association')
+    @metadatum('Localizations')
     def channel_association_radius_nm(self) : # nm
         """Return channel association radius nm."""
         return 30.
 
-    @metadatum('Association')
+    @metadatum('Localizations')
     def blink_association_radius_nm(self) : # nm
         """Return blink association radius nm."""
         if self.locs is not None :
@@ -627,12 +616,12 @@ class Config() :
             return associate_consecutive_frames_radius(locs=self.locs)[0]
         return 30.
 
-    @metadatum('Association')
+    @metadatum('Localizations')
     def blink_z_association_radius_nm(self) : # nm
         """Return blink z association radius nm."""
         return 100.
 
-    @metadatum('Association')
+    @metadatum('Localizations')
     def track_association_radius_nm(self) : # nm
         """Return track association radius nm."""
         return 500.

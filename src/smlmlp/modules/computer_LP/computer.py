@@ -20,6 +20,8 @@ import numba.cuda
 import psutil
 
 from arrlp import gc
+from smlmlp import RessourceClient
+
 
 
 class Computer:
@@ -50,8 +52,8 @@ class Computer:
 
     def __init__(self):
         """Initialize the computer object with resource monitors."""
-        self.ram = RAM()
-        self.vram = VRAM()
+        self.ram = RessourceClient("/tmp/ramtokens.sock", RAM())
+        self.vram = RessourceClient("/tmp/vramtokens.sock", VRAM())
         self.cpu = CPU()
         self.gpu = GPU()
         self.disc = Disc()

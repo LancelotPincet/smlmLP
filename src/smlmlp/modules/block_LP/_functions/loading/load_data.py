@@ -5,13 +5,15 @@
 
 
 
-from smlmlp import block
+from smlmlp import block, computer, load_chunking
 from contextlib import ExitStack
 from arrlp import gc
 import tifffile as tiff
 from stacklp import shapetif
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
+_MEMORY_COPY_FACTOR = load_chunking._MEMORY_COPY_FACTOR
+_MIN_FRAME_SIZE_GB = load_chunking._MIN_FRAME_SIZE_GB
 
 
 
@@ -41,7 +43,8 @@ def load_data(
         Paths to the TIFF files to load.
     chunk : int or None, optional
         Number of frames to load per iteration. If ``None``, the full
-        acquisition is loaded at once.
+        acquisition is requested at once. The effective value can be reduced
+        when the resource server grants fewer RAM/VRAM tokens than requested.
     pad : int, optional
         Number of frames of temporal padding to include before and after each
         chunk.
@@ -55,7 +58,7 @@ def load_data(
         Optional per-channel flip configuration. Each entry must be a pair
         ``(flip_y, flip_x)`` of booleans.
     cuda : bool, optional
-        Unused in this function. It is kept for block API consistency.
+        Whether to reserve VRAM tokens in addition to RAM tokens.
     parallel : bool, optional
         Unused in this function. It is kept for block API consistency.
     iterator : callable, optional
@@ -84,6 +87,22 @@ def load_data(
             First frame index of the right padding region.
         ``'pad11'``
             Last frame index of the right padding region.
+        ``'chunk_requested'``
+            Chunk size requested before resource-token negotiation.
+        ``'chunk'``
+            Effective chunk size after resource-token negotiation.
+        ``'ram_tokens_requested'``
+            RAM tokens requested for one full chunk including side padding.
+        ``'ram_tokens_minimum'``
+            Minimum RAM tokens required for one frame plus side padding.
+        ``'ram_tokens_granted'``
+            RAM tokens granted by the resource client.
+        ``'vram_tokens_requested'``
+            VRAM tokens requested when ``cuda=True``, otherwise ``0``.
+        ``'vram_tokens_minimum'``
+            Minimum VRAM tokens required when ``cuda=True``, otherwise ``0``.
+        ``'vram_tokens_granted'``
+            VRAM tokens granted when ``cuda=True``, otherwise ``0``.
 
     Raises
     ------
@@ -96,9 +115,19 @@ def load_data(
         If an input TIFF does not have exactly three dimensions.
     ValueError
         If the input TIFF files do not all have the same number of frames.
+    RuntimeError
+        If RAM or VRAM tokens cannot be reserved, or if ``cuda=True`` is used
+        while CUDA is unavailable.
 
     Notes
     -----
+    Before iteration starts, RAM tokens are reserved through ``computer.ram``.
+    When ``cuda=True``, VRAM tokens are also reserved through ``computer.vram``.
+    The requested token count corresponds to the full chunk length, including
+    side padding, multiplied by the same factors used by ``load_chunking``:
+    ``_MEMORY_COPY_FACTOR + 1`` for RAM and ``_MEMORY_COPY_FACTOR`` for VRAM.
+    The minimum reservation corresponds to one frame plus side padding.
+
     When memory mapping is available for a file, chunk extraction is performed
     directly on the mapped array. Otherwise, an internal temporary array is
     filled using explicit reads and temporal padding transfers.
@@ -173,6 +202,18 @@ def load_data(
         if nframes <= pad:
             pad = nframes - 1
 
+        # Reserve server-managed RAM/VRAM tokens before allocating or exposing
+        # chunk data. A partial grant reduces the effective chunk size.
+        frame_sizes_gb = _estimate_frame_size_gb(shapes)
+        chunk, resource_info, tokens = _reserve_load_tokens(
+            chunk,
+            pad,
+            frame_sizes_gb,
+            cuda,
+        )
+        for client, token in tokens:
+            stack.callback(_release_token, client, token)
+
         nloops = int(np.ceil(nframes / chunk))
 
         # Try to memory-map each file when requested.
@@ -222,6 +263,7 @@ def load_data(
                 "pad01": pad01,
                 "pad10": pad10,
                 "pad11": pad11,
+                **resource_info,
             }
 
             # Build the views on the memory-mapped arrays for the current chunk
@@ -285,6 +327,127 @@ def load_data(
                     count += 1
 
             yield channels, info
+
+
+
+def _estimate_frame_size_gb(shapes):
+    """Return total one-frame size across TIFF shapes as float32 gigabytes."""
+    frame_sizes_gb = sum(
+        int(np.prod(shape[1:3])) * np.dtype(np.float32).itemsize
+        for shape in shapes
+    ) / 1024**3
+
+    return max(float(frame_sizes_gb), _MIN_FRAME_SIZE_GB)
+
+
+
+def _reserve_load_tokens(chunk, pad, frame_sizes_gb, cuda):
+    """Reserve RAM and optional VRAM tokens and return the effective chunk."""
+    requested_chunk = int(chunk)
+    full_frames = requested_chunk + 2 * pad
+    minimum_frames = 1 + 2 * pad
+
+    ram_factor = _MEMORY_COPY_FACTOR + 1
+    ram_tokens_requested = full_frames * frame_sizes_gb * ram_factor
+    ram_tokens_minimum = minimum_frames * frame_sizes_gb * ram_factor
+    ram_token = _take_resource_tokens(
+        computer.ram,
+        "load_data:ram",
+        ram_tokens_requested,
+        ram_tokens_minimum,
+    )
+    chunk_limits = [
+        _chunk_from_granted_tokens(
+            ram_token,
+            frame_sizes_gb,
+            ram_factor,
+            pad,
+            requested_chunk,
+        )
+    ]
+
+    vram_token = None
+    vram_tokens_requested = 0
+    vram_tokens_minimum = 0
+    if cuda:
+        if not computer.gpu.cuda():
+            _release_token(computer.ram, ram_token)
+            raise RuntimeError("cuda=True was requested but CUDA is not available")
+
+        vram_factor = _MEMORY_COPY_FACTOR
+        vram_tokens_requested = full_frames * frame_sizes_gb * vram_factor
+        vram_tokens_minimum = minimum_frames * frame_sizes_gb * vram_factor
+        try:
+            vram_token = _take_resource_tokens(
+                computer.vram,
+                "load_data:vram",
+                vram_tokens_requested,
+                vram_tokens_minimum,
+            )
+        except Exception:
+            _release_token(computer.ram, ram_token)
+            raise
+        chunk_limits.append(
+            _chunk_from_granted_tokens(
+                vram_token,
+                frame_sizes_gb,
+                vram_factor,
+                pad,
+                requested_chunk,
+            )
+        )
+
+    effective_chunk = max(1, min(chunk_limits))
+    resource_info = {
+        "chunk_requested": requested_chunk,
+        "chunk": effective_chunk,
+        "frame_sizes_gb": frame_sizes_gb,
+        "ram_tokens_requested": ram_tokens_requested,
+        "ram_tokens_minimum": ram_tokens_minimum,
+        "ram_tokens_granted": float(ram_token.get("granted_tokens", 0)),
+        "vram_tokens_requested": vram_tokens_requested,
+        "vram_tokens_minimum": vram_tokens_minimum,
+        "vram_tokens_granted": (
+            float(vram_token.get("granted_tokens", 0))
+            if vram_token is not None else 0
+        ),
+    }
+    tokens = [(computer.ram, ram_token)]
+    if vram_token is not None:
+        tokens.append((computer.vram, vram_token))
+
+    return effective_chunk, resource_info, tokens
+
+
+
+def _take_resource_tokens(client, owner, requested_tokens, minimum_tokens):
+    """Reserve resource tokens and fail when the minimum is unavailable."""
+    server_minimum = max(1, int(np.ceil(minimum_tokens)))
+    token = client.take(requested_tokens, owner=owner, minimum=server_minimum)
+    if token is None or not token.get("ok", False):
+        reason = None if token is None else token.get("reason", "unknown reason")
+        raise RuntimeError(f"Could not reserve {owner} tokens: {reason}")
+
+    if float(token.get("granted_tokens", 0)) + 1e-12 < minimum_tokens:
+        _release_token(client, token)
+        raise RuntimeError(f"Could not reserve the minimum {owner} tokens")
+
+    return token
+
+
+
+def _chunk_from_granted_tokens(token, frame_sizes_gb, factor, pad, requested_chunk):
+    """Convert granted memory tokens back to a safe chunk length."""
+    granted_tokens = float(token.get("granted_tokens", 0))
+    frames = int(np.floor(granted_tokens / (frame_sizes_gb * factor) + 1e-9))
+    return max(1, min(requested_chunk, frames - 2 * pad))
+
+
+
+def _release_token(client, token):
+    """Release a server token when the client received a reservation id."""
+    if isinstance(token, dict) and "reservation_id" in token:
+        client.release(token)
 
 
 

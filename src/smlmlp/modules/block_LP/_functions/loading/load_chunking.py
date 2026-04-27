@@ -150,6 +150,9 @@ def load_chunking(*tif_paths, cuda=False, parallel=False):
 
     return loaded_max, info
 
+load_chunking._MIN_FRAME_SIZE_GB = _MIN_FRAME_SIZE_GB
+load_chunking._MEMORY_COPY_FACTOR = _MEMORY_COPY_FACTOR
+
 
 
 def _resolve_ncores(parallel, cpu_cores_limit):

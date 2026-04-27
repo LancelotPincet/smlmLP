@@ -702,15 +702,93 @@ def test_metric_frc_placeholder():
         )
 
 
-def test_metric_nena_placeholder():
+# %% test metric_nena
+
+
+def test_metric_nena_gaussian_precision():
     from smlmlp.modules.analysis_LP._functions.metric.metric_nena import metric_nena
 
-    with pytest.raises(SyntaxError, match="Not implemented yet"):
-        metric_nena(
-            np.array([1.0, 2.0], dtype=np.float32),
-            np.array([3.0, 4.0], dtype=np.float32),
-            np.array([1, 2], dtype=np.uint64),
+    rng = np.random.default_rng(12345)
+    n = 600
+    sigma = 4.0
+
+    x0 = np.arange(n, dtype=np.float32) * 20.0
+    differences = rng.normal(loc=0.5, scale=sigma, size=n).astype(np.float32)
+
+    xx = np.concatenate((x0, x0))
+    yy = np.zeros(2 * n, dtype=np.float32)
+    fr = np.concatenate(
+        (np.ones(n, dtype=np.uint32), np.full(n, 2, dtype=np.uint32))
+    )
+    col = np.concatenate((np.zeros(n, dtype=np.float32), -differences))
+
+    precision, info = metric_nena(
+        col,
+        xx,
+        yy,
+        fr,
+        association_radius_nm=5.0,
+        bins=60,
+        parallel=False,
+    )
+
+    assert np.isclose(precision, sigma / np.sqrt(2.0), rtol=0.2)
+    assert info["n_pairs"] == n
+    assert info["hist"].sum() == n
+    np.testing.assert_array_equal(info["source_indices"], np.arange(n))
+    np.testing.assert_array_equal(info["neighbor_indices"], np.arange(n, 2 * n))
+
+
+def test_metric_nena_uses_z_filter():
+    from smlmlp.modules.analysis_LP._functions.metric.metric_nena import metric_nena
+
+    rng = np.random.default_rng(54321)
+    n_valid = 300
+    n_rejected = 40
+    n = n_valid + n_rejected
+
+    x0 = np.arange(n, dtype=np.float32) * 20.0
+    differences = rng.normal(loc=0.0, scale=3.0, size=n).astype(np.float32)
+
+    xx = np.concatenate((x0, x0))
+    yy = np.zeros(2 * n, dtype=np.float32)
+    fr = np.concatenate(
+        (np.ones(n, dtype=np.uint32), np.full(n, 2, dtype=np.uint32))
+    )
+    col = np.concatenate((np.zeros(n, dtype=np.float32), -differences))
+    zz = np.concatenate(
+        (
+            np.zeros(n, dtype=np.float32),
+            np.concatenate(
+                (
+                    np.zeros(n_valid, dtype=np.float32),
+                    np.full(n_rejected, 10.0, dtype=np.float32),
+                )
+            ),
         )
+    )
+
+    _, info = metric_nena(
+        col,
+        xx,
+        yy,
+        fr,
+        zz=zz,
+        association_radius_nm=5.0,
+        z_association_radius_nm=1.0,
+        bins=50,
+        parallel=False,
+    )
+
+    assert info["n_pairs"] == n_valid
+    np.testing.assert_array_equal(info["source_indices"], np.arange(n_valid))
+    np.testing.assert_array_equal(
+        info["neighbor_indices"],
+        np.arange(n, n + n_valid),
+    )
+
+
+# %% test metric placeholders
 
 
 def test_metric_overloc_placeholder():

@@ -18,7 +18,7 @@ def associate_consecutive_frames_radius(
     yy,
     fr,
     *,
-    bins=1000,
+    bins=50,
     r_min=1.0,
     r_max=None,
     smooth=3,

@@ -29,10 +29,10 @@ def locs_individual_splinefit(
     channels_QE=1.0,
     cuda=False,
     parallel=False,
-    channels_psf_xtangents=None,
-    channels_psf_ytangents=None,
-    channels_psf_ztangents=None,
-    channels_psf_coeffs=None,
+    channels_psf_3d_xtangents=None,
+    channels_psf_3d_ytangents=None,
+    channels_psf_3d_ztangents=None,
+    channels_psf_3d_spline_coeffs=None,
 ):
     """
     Fit each crop independently with a 3D spline PSF model.
@@ -65,13 +65,13 @@ def locs_individual_splinefit(
         Whether to run the fit on GPU.
     parallel : bool, optional
         Whether to enable CPU parallelization.
-    channels_psf_xtangents : sequence
+    channels_psf_3d_xtangents : sequence
         Spline x tangents, one set per channel.
-    channels_psf_ytangents : sequence
+    channels_psf_3d_ytangents : sequence
         Spline y tangents, one set per channel.
-    channels_psf_ztangents : sequence
+    channels_psf_3d_ztangents : sequence
         Spline z tangents, one set per channel.
-    channels_psf_coeffs : sequence
+    channels_psf_3d_spline_coeffs : sequence
         Spline coefficients, one set per channel.
 
     Returns
@@ -106,10 +106,10 @@ def locs_individual_splinefit(
     ...     x0,
     ...     y0,
     ...     channels_pixels_nm=[(100.0, 100.0)],
-    ...     channels_psf_xtangents=tx,
-    ...     channels_psf_ytangents=ty,
-    ...     channels_psf_ztangents=tz,
-    ...     channels_psf_coeffs=coeffs,
+    ...     channels_psf_3d_xtangents=tx,
+    ...     channels_psf_3d_ytangents=ty,
+    ...     channels_psf_3d_ztangents=tz,
+    ...     channels_psf_3d_spline_coeffs=coeffs,
     ... )
     >>> mux.shape == muy.shape == muz.shape
     True
@@ -121,10 +121,10 @@ def locs_individual_splinefit(
     ...     x0,
     ...     y0,
     ...     channels_pixels_nm=[(100.0, 120.0)],
-    ...     channels_psf_xtangents=tx,
-    ...     channels_psf_ytangents=ty,
-    ...     channels_psf_ztangents=tz,
-    ...     channels_psf_coeffs=coeffs,
+    ...     channels_psf_3d_xtangents=tx,
+    ...     channels_psf_3d_ytangents=ty,
+    ...     channels_psf_3d_ztangents=tz,
+    ...     channels_psf_3d_spline_coeffs=coeffs,
     ... )
     >>> info['amp'].ndim
     1
@@ -142,25 +142,27 @@ def locs_individual_splinefit(
     distribution = _resolve_distribution(distribution)
     estimator = _resolve_estimator(estimator, distribution)
 
-    if channels_psf_xtangents is None:
-        raise SyntaxError("channels_psf_xtangents must be specified as a kwarg")
-    if len(channels_psf_xtangents) != n_channels:
-        raise ValueError("channels_psf_xtangents does not have the same length as crops")
+    if channels_psf_3d_xtangents is None:
+        raise SyntaxError("channels_psf_3d_xtangents must be specified as a kwarg")
+    if len(channels_psf_3d_xtangents) != n_channels:
+        raise ValueError("channels_psf_3d_xtangents does not have the same length as crops")
 
-    if channels_psf_ytangents is None:
-        raise SyntaxError("channels_psf_ytangents must be specified as a kwarg")
-    if len(channels_psf_ytangents) != n_channels:
-        raise ValueError("channels_psf_ytangents does not have the same length as crops")
+    if channels_psf_3d_ytangents is None:
+        raise SyntaxError("channels_psf_3d_ytangents must be specified as a kwarg")
+    if len(channels_psf_3d_ytangents) != n_channels:
+        raise ValueError("channels_psf_3d_ytangents does not have the same length as crops")
 
-    if channels_psf_ztangents is None:
-        raise SyntaxError("channels_psf_ztangents must be specified as a kwarg")
-    if len(channels_psf_ztangents) != n_channels:
-        raise ValueError("channels_psf_ztangents does not have the same length as crops")
+    if channels_psf_3d_ztangents is None:
+        raise SyntaxError("channels_psf_3d_ztangents must be specified as a kwarg")
+    if len(channels_psf_3d_ztangents) != n_channels:
+        raise ValueError("channels_psf_3d_ztangents does not have the same length as crops")
 
-    if channels_psf_coeffs is None:
-        raise SyntaxError("channels_psf_coeffs must be specified as a kwarg")
-    if len(channels_psf_coeffs) != n_channels:
-        raise ValueError("channels_psf_coeffs does not have the same length as crops")
+    if channels_psf_3d_spline_coeffs is None:
+        raise SyntaxError("channels_psf_3d_spline_coeffs must be specified as a kwarg")
+    if len(channels_psf_3d_spline_coeffs) != n_channels:
+        raise ValueError(
+            "channels_psf_3d_spline_coeffs does not have the same length as crops"
+        )
 
     fit_kwargs = [
         dict(
@@ -170,10 +172,10 @@ def locs_individual_splinefit(
             coeffs=coeffs,
         )
         for tx, ty, tz, coeffs in zip(
-            channels_psf_xtangents,
-            channels_psf_ytangents,
-            channels_psf_ztangents,
-            channels_psf_coeffs,
+            channels_psf_3d_xtangents,
+            channels_psf_3d_ytangents,
+            channels_psf_3d_ztangents,
+            channels_psf_3d_spline_coeffs,
         )
     ]
 

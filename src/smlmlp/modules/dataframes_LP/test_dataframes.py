@@ -39,6 +39,15 @@ def test_dataframe_columns_are_registered_on_classes():
     assert "x [nm]" not in dataframes["points"].head2save
 
 
+def test_column_fill_metadata_is_available_on_dataframes():
+    """Column fill metadata is exposed as dataframe attributes."""
+    assert dataframes["detections"].det_fill == 0
+    assert dataframes["points"].pnt_fill == 0
+    assert dataframes["detections"].intensity_fill == 0
+    assert np.isnan(dataframes["points"].x_fill)
+    assert np.isnan(dataframes["detections"].x_fill)
+
+
 def test_column_exists_properties_are_installed_on_all_dataframe_classes():
     """All dataframe classes expose all dynamic column-exists properties."""
     assert hasattr(dataframes["detections"], "x_exists")
@@ -95,6 +104,23 @@ def test_sigma_aliases_use_existing_fit_columns():
     np.testing.assert_allclose(locs.detections.sigma, [100.0, 121.0])
     np.testing.assert_allclose(locs.detections.sigma_x, [100.0, 121.0])
     np.testing.assert_allclose(locs.detections.sigma_y, [100.0, 121.0])
+
+
+def test_sigma_uses_channel_fit_models():
+    """Sigma is resolved per detection from the configured channel fit models."""
+    locs = Locs()
+    locs.config.cameras[0].nchannels = 3
+    locs.config.channels_fit_models = ["isogauss", "gauss", "spline"]
+    locs.detections.ch = np.array([1, 2, 3, 2], dtype=np.uint8)
+    locs.detections.sigma_fit = np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float32)
+    locs.detections.sigma_x_fit = np.array([1.0, 4.0, 9.0, 16.0], dtype=np.float32)
+    locs.detections.sigma_y_fit = np.array([9.0, 16.0, 25.0, 36.0], dtype=np.float32)
+
+    np.testing.assert_allclose(
+        locs.detections.sigma,
+        [10.0, 8.0, np.nan, 24.0],
+        equal_nan=True,
+    )
 
 
 def test_point_tilt_alias_targets_tilt_column():
@@ -203,6 +229,7 @@ def test_dynamic_zernike_columns_are_registered_once():
     locs.detections.nzernike = 2
 
     assert "zernike_01" in locs.detections.columns_dict
+    assert locs.detections.zernike_01_fill == 0
     assert "zernike 01" in locs.detections.head2save
     np.testing.assert_allclose(locs.detections.zernike_01, np.zeros(locs.ndetections))
 

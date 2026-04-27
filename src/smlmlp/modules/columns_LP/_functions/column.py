@@ -23,15 +23,37 @@ class column:
         Possible file headers for this column. The first one is the canonical header.
     dtype : type
         Numpy dtype used when assigning this column.
+    fill : {0, numpy.nan}
+        Fill value used for missing values of this logical column.
     save : bool, default=True
         Whether this column should be saved.
     agg : str or callable, default='mean'
         Aggregation method used when merging from a parent dataframe.
     index : str or bool, default=False
         Parent dataframe name for index columns. False means this is not an index column.
+
+    Returns
+    -------
+    column
+        Descriptor installed on dataframe classes by decorating the column function.
+
+    Notes
+    -----
+    The descriptor registers each logical column globally, maps all accepted headers
+    to the same descriptor, and installs lazy accessors on the dataframe classes.
+    The fill metadata is exposed as ``<col>_fill`` on dataframe instances and is
+    limited to ``0`` or ``numpy.nan`` so missing-value behavior stays explicit.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from smlmlp import column
+    >>> desc = column(headers=["count"], dtype=np.uint32, fill=0)
+    >>> desc.fill
+    0
     """
 
-    def __init__(self, *, headers, dtype, save=True, agg="mean", index=False):
+    def __init__(self, *, headers, dtype, fill, save=True, agg="mean", index=False):
         """Initialize the object."""
         self.headers = headers
         self.header = headers[0]
@@ -39,6 +61,15 @@ class column:
         self.agg = agg
         self.index = index
         self.dtype = dtype
+        self.fill = self._normalize_fill(fill)
+
+    def _normalize_fill(self, fill):
+        """Validate and normalize fill metadata."""
+        if isinstance(fill, (int, float, np.integer, np.floating)) and fill == 0:
+            return 0
+        if isinstance(fill, (float, np.floating)) and np.isnan(fill):
+            return np.nan
+        raise ValueError("column fill must be 0 or np.nan")
 
     def __call__(self, func):
         """Decorator entry point."""
@@ -96,6 +127,12 @@ class column:
         else:
             setattr(MainDataFrame, f"{self.col}_mine", False)
             setattr(DataFrame, f"{self.col}_mine", True)
+
+        fill_name = f"{self.col}_fill"
+        if hasattr(MainDataFrame, fill_name) or hasattr(DataFrame, fill_name):
+            raise SyntaxError(f"{fill_name} cannot be defined twice")
+        setattr(MainDataFrame, fill_name, self.fill)
+        setattr(DataFrame, fill_name, self.fill)
 
         self._install_dataframe_exists_property()
         self._install_dataframe_merge_property()

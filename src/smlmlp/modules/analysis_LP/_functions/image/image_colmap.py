@@ -20,7 +20,6 @@ def image_colmap(
     y_shape=None,
     shape=None,
     *,
-    reducer="mean",
     fill=np.nan,
     cuda=False,
     parallel=False,
@@ -38,8 +37,6 @@ def image_colmap(
         Output dimensions. If omitted, a one-row image large enough to contain
         the maximum pixel id is returned because a flat id alone cannot recover
         the original width.
-    reducer : {'mean', 'sum'}, optional
-        Aggregation method for duplicate pixels.
     fill : float, optional
         Value assigned to pixels without data. Default is NaN.
     cuda, parallel : bool, optional
@@ -59,9 +56,7 @@ def image_colmap(
     pixels = _prepare_pix(pix, len(values))
     y_size, x_size = _resolve_colmap_shape(pixels, shape, x_shape, y_shape)
 
-    reducer = reducer.lower()
-    if reducer not in {"mean", "sum"}:
-        raise ValueError("reducer must be 'mean' or 'sum'.")
+    reducer = "sum" if fill == 0 else "mean"
 
     sums, counts = _colmap_sum_count(values, pixels, y_size * x_size)
     image = sums.reshape((y_size, x_size)).astype(np.float32)

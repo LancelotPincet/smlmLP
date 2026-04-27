@@ -32,7 +32,7 @@ def locs_individual_gaussfit(
     channels_psf_xsigmas_nm=SIGMA,
     channels_psf_ysigmas_nm=SIGMA,
     channels_psf_thetas_deg=0.0,
-    channels_fit_thetas=True,
+    channels_fit_thetas=False,
 ):
     """
     Fit each crop independently with an anisotropic 2D Gaussian model.
@@ -69,9 +69,9 @@ def locs_individual_gaussfit(
         Initial/fixed PSF sigma along x for each channel.
     channels_psf_ysigmas_nm : float or sequence, optional
         Initial/fixed PSF sigma along y for each channel.
-    channels_psf_theta_deg : float or sequence, optional
+    channels_psf_thetas_deg : float or sequence, optional
         Initial/fixed PSF angle in degrees for each channel.
-    channels_fit_theta : bool, optional
+    channels_fit_thetas : bool, optional
         Whether to fit the PSF rotation angle.
 
     Returns
@@ -120,8 +120,8 @@ def locs_individual_gaussfit(
     ...     channels_pixels_nm=[(100.0, 120.0)],
     ...     channels_psf_xsigmas_nm=[80.0],
     ...     channels_psf_ysigmas_nm=[95.0],
-    ...     channels_psf_theta_deg=[5.0],
-    ...     channels_fit_theta=True,
+    ...     channels_psf_thetas_deg=[5.0],
+    ...     channels_fit_thetas=True,
     ... )
     >>> info['sigmax'].ndim
     1
@@ -147,12 +147,12 @@ def locs_individual_gaussfit(
         channels_psf_ysigmas_nm,
         n_channels,
     )
-    channels_psf_theta_deg = _normalize_psf_parameter(
-        channels_psf_theta_deg,
+    channels_psf_thetas_deg = _normalize_psf_parameter(
+        channels_psf_thetas_deg,
         n_channels,
     )
-    channels_fit_theta = _normalize_psf_parameter(
-        channels_fit_theta,
+    channels_fit_thetas = _normalize_psf_parameter(
+        channels_fit_thetas,
         n_channels,
     )
 
@@ -169,8 +169,8 @@ def locs_individual_gaussfit(
             channels_pixels_nm,
             channels_psf_xsigmas_nm,
             channels_psf_ysigmas_nm,
-            channels_psf_theta_deg,
-            channels_fit_theta,
+            channels_psf_thetas_deg,
+            channels_fit_thetas,
         )
     ]
 

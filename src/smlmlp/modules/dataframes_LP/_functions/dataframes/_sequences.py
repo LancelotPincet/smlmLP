@@ -13,7 +13,7 @@ from smlmlp import DataFrame, column
 class sequences(DataFrame) :
     """Sequence-level dataframe aggregated from points."""
 
-    @column(headers=['sequence'], dtype=np.uint32, save=True, agg='min', index="points")
+    @column(headers=['sequence'], dtype=np.uint32, fill=0, save=True, agg='min', index="points")
     def seq(self) :
         """Assign sequence identifiers from frame numbers."""
         array = self.fr // self.locs.config.frames_per_sequence

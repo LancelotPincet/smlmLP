@@ -13,7 +13,7 @@ from smlmlp import DataFrame, column
 class dyes(DataFrame) :
     """Dye-level dataframe aggregated from blinks."""
 
-    @column(headers=['dye'], dtype=np.uint8, save=True, agg='min', index="blinks")
+    @column(headers=['dye'], dtype=np.uint8, fill=0, save=True, agg='min', index="blinks")
     def dye(self) :
         """Assign dye identifiers from demixing or a single-dye default."""
         if self.locs.config.ndyes == 1 :

@@ -220,6 +220,87 @@ def test_load_data(tmp_path):
     np.testing.assert_array_equal(channels[0], stack[:2, 1:3, 1:4])
 
 
+def test_load_data_reserves_resource_tokens_and_limits_chunk(tmp_path, monkeypatch):
+    import importlib
+
+    load_data_module = importlib.import_module(
+        "smlmlp.modules.block_LP._functions.loading.load_data"
+    )
+
+    class _FakeResource:
+        def __init__(self, granted_tokens, reservation_id):
+            self.granted_tokens = granted_tokens
+            self.reservation_id = reservation_id
+            self.takes = []
+            self.releases = []
+
+        def take(self, value, owner, minimum=None, **kwargs):
+            token = {
+                "ok": True,
+                "granted_tokens": self.granted_tokens,
+                "reservation_id": self.reservation_id,
+            }
+            self.takes.append({"value": value, "owner": owner, "minimum": minimum})
+            return token
+
+        def release(self, token):
+            self.releases.append(token)
+            return {"ok": True}
+
+    class _FakeGPU:
+        def cuda(self):
+            return True
+
+    path = tmp_path / "movie.tif"
+    stack = np.arange(8 * 4 * 4, dtype=np.uint16).reshape(8, 4, 4)
+    tiff.imwrite(path, stack, photometric="minisblack")
+
+    requested_chunk = 6
+    granted_chunk = 3
+    pad = 1
+    frame_size_gb = 4 * 4 * np.dtype(np.float32).itemsize / 1024**3
+    ram_factor = load_data_module._MEMORY_COPY_FACTOR + 1
+    vram_factor = load_data_module._MEMORY_COPY_FACTOR
+    ram_requested = (requested_chunk + 2 * pad) * frame_size_gb * ram_factor
+    vram_requested = (requested_chunk + 2 * pad) * frame_size_gb * vram_factor
+    vram_granted = (granted_chunk + 2 * pad) * frame_size_gb * vram_factor
+
+    fake_ram = _FakeResource(ram_requested, "ram-token")
+    fake_vram = _FakeResource(vram_granted, "vram-token")
+    monkeypatch.setattr(load_data_module.computer, "ram", fake_ram)
+    monkeypatch.setattr(load_data_module.computer, "vram", fake_vram)
+    monkeypatch.setattr(load_data_module.computer, "gpu", _FakeGPU())
+
+    chunks = list(
+        load_data_module.load_data(
+            str(path),
+            chunk=requested_chunk,
+            pad=pad,
+            memmap=True,
+            cuda=True,
+        )
+    )
+
+    info = chunks[0][1]
+    assert len(chunks) == 3
+    assert info["chunk_requested"] == requested_chunk
+    assert info["chunk"] == granted_chunk
+    np.testing.assert_allclose(info["ram_tokens_requested"], ram_requested)
+    np.testing.assert_allclose(info["vram_tokens_requested"], vram_requested)
+    np.testing.assert_allclose(
+        info["ram_tokens_minimum"],
+        (1 + 2 * pad) * frame_size_gb * ram_factor,
+    )
+    np.testing.assert_allclose(
+        info["vram_tokens_minimum"],
+        (1 + 2 * pad) * frame_size_gb * vram_factor,
+    )
+    assert fake_ram.takes[0]["owner"] == "load_data:ram"
+    assert fake_vram.takes[0]["owner"] == "load_data:vram"
+    assert fake_ram.releases[0]["reservation_id"] == "ram-token"
+    assert fake_vram.releases[0]["reservation_id"] == "vram-token"
+
+
 # %% test load_chunking
 
 
@@ -435,6 +516,10 @@ def test_crop_individual_extract():
 
     assert len(crops) == 1
     assert len(crops[0]) == 3
+    assert np.issubdtype(X0[0].dtype, np.signedinteger)
+    assert np.issubdtype(Y0[0].dtype, np.signedinteger)
+    assert X0[0][0] < 0
+    assert Y0[0][0] < 0
 
 
 def test_crop_individual_extract_one_based_channels():
@@ -822,6 +907,139 @@ def test_globloc_fit_isogauss():
     assert info["sigma"].ndim == 1
 
 
+# %% test locs_individual_fit
+
+
+def test_locs_individual_fit_dispatches_channel_models(monkeypatch):
+    import importlib
+
+    module = importlib.import_module(
+        "smlmlp.modules.block_LP._functions.localization.locs_individual_fit"
+    )
+    calls = []
+
+    class _FakeFit:
+        """No-op optimizer recording fitted model names."""
+
+        def __init__(self, function, estimator):
+            """Store the model function."""
+            self.function = function
+
+        def __call__(self, *args):
+            """Record the fit call without changing model parameters."""
+            calls.append((self.function.model, len(args)))
+
+    class _FakeModel:
+        """Minimal model preserving initialized parameters."""
+
+        model = None
+
+        def __init__(self, mux, muy, amp, offset, cuda=False, **kwargs):
+            """Store fit parameters and initialization keywords."""
+            self.muz = kwargs.pop("muz", None)
+            self.mux = mux
+            self.muy = muy
+            self.amp = amp
+            self.offset = offset
+            self.kwargs = kwargs
+
+    class _FakeIsoGaussian(_FakeModel):
+        """Fake isotropic Gaussian model."""
+
+        model = "isogauss"
+
+        def __init__(self, *args, **kwargs):
+            """Store isotropic sigma."""
+            super().__init__(*args, **kwargs)
+            self.sig = np.full_like(self.mux, self.kwargs["sig"], dtype=np.float32)
+
+    class _FakeGaussian2D(_FakeModel):
+        """Fake anisotropic Gaussian model."""
+
+        model = "gauss"
+
+        def __init__(self, *args, **kwargs):
+            """Store anisotropic sigmas."""
+            super().__init__(*args, **kwargs)
+            self.sigx = np.full_like(self.mux, self.kwargs["sigx"], dtype=np.float32)
+            self.sigy = np.full_like(self.muy, self.kwargs["sigy"], dtype=np.float32)
+
+    class _FakeSpline3D(_FakeModel):
+        """Fake 3D spline model."""
+
+        model = "spline"
+
+    def _fake_mle(distribution):
+        """Return a lightweight fake estimator."""
+        return ("mle", distribution)
+
+    def _fake_poisson():
+        """Return a lightweight fake distribution."""
+        return "poisson"
+
+    monkeypatch.setattr(module, "LM", _FakeFit)
+    monkeypatch.setattr(module, "MLE", _fake_mle)
+    monkeypatch.setattr(module, "Poisson", _fake_poisson)
+    monkeypatch.setattr(module, "IsoGaussian", _FakeIsoGaussian)
+    monkeypatch.setattr(module, "Gaussian2D", _FakeGaussian2D)
+    monkeypatch.setattr(module, "Spline3D", _FakeSpline3D)
+
+    crops = [np.full((1, 3, 3), i + 1, dtype=np.float32) for i in range(3)]
+    x0 = [
+        np.array([10.0], dtype=np.float32),
+        np.array([20.0], dtype=np.float32),
+        np.array([30.0], dtype=np.float32),
+    ]
+    y0 = [
+        np.array([100.0], dtype=np.float32),
+        np.array([200.0], dtype=np.float32),
+        np.array([300.0], dtype=np.float32),
+    ]
+    tx = [np.linspace(-1.0, 1.0, 8, dtype=np.float32) for _ in range(3)]
+    ty = [np.linspace(-1.0, 1.0, 8, dtype=np.float32) for _ in range(3)]
+    tz = [np.linspace(-1.0, 1.0, 8, dtype=np.float32) for _ in range(3)]
+    coeffs = [np.ones((4, 4, 4), dtype=np.float32) for _ in range(3)]
+
+    mux, muy, muz, info = module.locs_individual_fit(
+        crops,
+        x0,
+        y0,
+        channels_fit_models=["isogauss", "gauss", "spline"],
+        channels_pixels_nm=[(1.0, 1.0), (1.0, 1.0), (1.0, 1.0)],
+        channels_psf_sigmas_nm=[2.0, 2.0, 2.0],
+        channels_psf_xsigmas_nm=[3.0, 3.0, 3.0],
+        channels_psf_ysigmas_nm=[4.0, 4.0, 4.0],
+        channels_psf_3d_xtangents=tx,
+        channels_psf_3d_ytangents=ty,
+        channels_psf_3d_ztangents=tz,
+        channels_psf_3d_spline_coeffs=coeffs,
+    )
+
+    np.testing.assert_allclose(mux, [11.0, 21.0, 31.0])
+    np.testing.assert_allclose(muy, [101.0, 201.0, 301.0])
+    np.testing.assert_allclose(muz, [np.nan, np.nan, 0.0], equal_nan=True)
+    np.testing.assert_allclose(info["amp"], [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(info["offset"], [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(info["sigma"], [2.0, np.sqrt(12.0), np.nan], equal_nan=True)
+    np.testing.assert_allclose(info["sigmax"], [np.nan, 3.0, np.nan], equal_nan=True)
+    np.testing.assert_allclose(info["sigmay"], [np.nan, 4.0, np.nan], equal_nan=True)
+    assert info["models"] == ["isogauss", "gauss", "spline"]
+    assert calls == [("isogauss", 3), ("gauss", 3), ("spline", 4)]
+
+
+def test_locs_individual_fit_rejects_unknown_model():
+    from smlmlp.modules.block_LP._functions.localization.locs_individual_fit import (
+        locs_individual_fit,
+    )
+
+    crops = [np.zeros((1, 3, 3), dtype=np.float32)]
+    x0 = [np.zeros(1, dtype=np.float32)]
+    y0 = [np.zeros(1, dtype=np.float32)]
+
+    with pytest.raises(ValueError, match="channels_fit_models"):
+        locs_individual_fit(crops, x0, y0, channels_fit_models=["bad"])
+
+
 # %% test locs_individual_gaussfit
 
 
@@ -875,33 +1093,76 @@ def test_locs_individual_isogaussfit():
 # %% test locs_individual_splinefit
 
 
-@pytest.mark.skip(reason="source file has variable ordering bug")
-def test_locs_individual_splinefit():
-    from smlmlp.modules.block_LP._functions.localization.locs_individual_splinefit import (
-        locs_individual_splinefit,
-    )
+def test_locs_individual_splinefit(monkeypatch):
+    import importlib
 
-    crops = [np.random.rand(2, 7, 7).astype(np.float32)]
+    module = importlib.import_module(
+        "smlmlp.modules.block_LP._functions.localization.locs_individual_splinefit"
+    )
+    calls = []
+
+    class _FakeFit:
+        """No-op optimizer recording spline fit calls."""
+
+        def __init__(self, function, estimator):
+            """Store the model function."""
+            self.function = function
+
+        def __call__(self, *args):
+            """Record the fit call without changing model parameters."""
+            calls.append(len(args))
+
+    class _FakeSpline3D:
+        """Minimal 3D spline model preserving initialized parameters."""
+
+        def __init__(self, mux, muy, muz, amp, offset, cuda=False, **kwargs):
+            """Store fit parameters and spline metadata."""
+            self.mux = mux
+            self.muy = muy
+            self.muz = muz
+            self.amp = amp
+            self.offset = offset
+            self.kwargs = kwargs
+
+    def _fake_mle(distribution):
+        """Return a lightweight fake estimator."""
+        return ("mle", distribution)
+
+    def _fake_poisson():
+        """Return a lightweight fake distribution."""
+        return "poisson"
+
+    monkeypatch.setattr(module, "LM", _FakeFit)
+    monkeypatch.setattr(module, "MLE", _fake_mle)
+    monkeypatch.setattr(module, "Poisson", _fake_poisson)
+    monkeypatch.setattr(module, "Spline3D", _FakeSpline3D)
+
+    crops = [np.full((2, 7, 7), 5.0, dtype=np.float32)]
     x0 = [np.array([10, 20], dtype=np.float32)]
     y0 = [np.array([30, 40], dtype=np.float32)]
-    tx = [np.linspace(-1.0, 1.0, 5, dtype=np.float32)]
-    ty = [np.linspace(-1.0, 1.0, 5, dtype=np.float32)]
-    tz = [np.linspace(-0.5, 0.5, 5, dtype=np.float32)]
+    tx = [np.linspace(-1.0, 1.0, 8, dtype=np.float32)]
+    ty = [np.linspace(-1.0, 1.0, 8, dtype=np.float32)]
+    tz = [np.linspace(-0.5, 0.5, 8, dtype=np.float32)]
     coeffs = [np.ones((4, 4, 4), dtype=np.float32)]
 
-    mux, muy, muz, info = locs_individual_splinefit(
+    mux, muy, muz, info = module.locs_individual_splinefit(
         crops,
         x0,
         y0,
-        channels_pixels_nm=[(100.0, 100.0)],
-        channels_psf_xtangents=tx,
-        channels_psf_ytangents=ty,
-        channels_psf_ztangents=tz,
-        channels_psf_coeffs=coeffs,
+        channels_pixels_nm=[(1.0, 1.0)],
+        channels_psf_3d_xtangents=tx,
+        channels_psf_3d_ytangents=ty,
+        channels_psf_3d_ztangents=tz,
+        channels_psf_3d_spline_coeffs=coeffs,
     )
 
-    assert mux.shape == muy.shape == muz.shape
+    np.testing.assert_allclose(mux, [13.0, 23.0])
+    np.testing.assert_allclose(muy, [33.0, 43.0])
+    np.testing.assert_allclose(muz, [0.0, 0.0])
+    np.testing.assert_allclose(info["amp"], [5.0, 5.0])
+    np.testing.assert_allclose(info["offset"], [5.0, 5.0])
     assert sorted(info) == ["amp", "offset"]
+    assert calls == [4]
 
 
 # %% test locs_individual_barycenter
@@ -934,6 +1195,40 @@ def test_locs_individual_barycenter_with_pixels():
     mux, muy, info = locs_individual_barycenter(crops, x0, y0, channels_pixels_nm=pix)
 
     assert mux.ndim == 1
+
+
+def test_locs_individual_barycenter_cuda_matches_cpu():
+    from numba import cuda
+    from smlmlp.modules.block_LP._functions.localization.locs_individual_barycenter import (
+        locs_individual_barycenter,
+    )
+
+    if not cuda.is_available():
+        pytest.skip("CUDA is not available")
+
+    rng = np.random.default_rng(0)
+    crops = [rng.random((8, 15, 15), dtype=np.float32)]
+    x0 = [np.arange(-4, 4, dtype=np.int32)]
+    y0 = [np.arange(3, 11, dtype=np.int32)]
+    pix = [(108.0, 108.0)]
+
+    cpu_x, cpu_y, _ = locs_individual_barycenter(
+        crops,
+        x0,
+        y0,
+        channels_pixels_nm=pix,
+        cuda=False,
+    )
+    gpu_x, gpu_y, _ = locs_individual_barycenter(
+        crops,
+        x0,
+        y0,
+        channels_pixels_nm=pix,
+        cuda=True,
+    )
+
+    np.testing.assert_allclose(gpu_x, cpu_x, rtol=1e-5, atol=1e-3)
+    np.testing.assert_allclose(gpu_y, cpu_y, rtol=1e-5, atol=1e-3)
 
 
 # %% test globdet_channel

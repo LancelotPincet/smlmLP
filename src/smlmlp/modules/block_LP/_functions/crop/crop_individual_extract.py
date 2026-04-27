@@ -164,8 +164,8 @@ def crop_individual_extract(
         n = len(ch_fr)
 
         crop = xp.empty((n, height, width), dtype=np.float32)
-        x0_pix = xp.empty(n, dtype=np.uint16)
-        y0_pix = xp.empty(n, dtype=np.uint16)
+        x0_pix = xp.empty(n, dtype=np.int32)
+        y0_pix = xp.empty(n, dtype=np.int32)
 
         if cuda:
             threads_per_block = (8, 8, 8)

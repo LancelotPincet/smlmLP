@@ -13,7 +13,7 @@ from smlmlp import DataFrame, column
 class molecules(DataFrame) :
     """Molecule-level dataframe aggregated from blinks."""
 
-    @column(headers=['molecule'], dtype=np.uint64, save=True, agg='min', index="blinks")
+    @column(headers=['molecule'], dtype=np.uint64, fill=0, save=True, agg='min', index="blinks")
     def mol(self) :
         """Associate blinks into molecule identifiers."""
         from smlmlp import associate_molecules

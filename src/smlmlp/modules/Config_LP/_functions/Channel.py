@@ -46,9 +46,12 @@ class Channel:
         ("psf_xtangents", "Data"),
         ("psf_ytangents", "Data"),
         ("psf_spline_coeffs", "Data"),
-        ("fit_theta", "Fit"),
-        ("fit_model", "Fit"),
-        ("fit_init", "Fit"),
+        ("psf_3d_xtangents", "Data"),
+        ("psf_3d_ytangents", "Data"),
+        ("psf_3d_ztangents", "Data"),
+        ("psf_3d_spline_coeffs", "Data"),
+        ("fit_theta", "Localizations"),
+        ("fit_model", "Localizations"),
         ("x_shift_nm", "Registration"),
         ("y_shift_nm", "Registration"),
         ("rotation_deg", "Registration"),
@@ -67,6 +70,7 @@ class Channel:
         "psf_kernel",
         "default_crop_nm",
         "crop_pix",
+        "fit_init",
         "image_transform_matrix",
         "locs_transform_matrix",
     ]
@@ -109,6 +113,26 @@ class Channel:
     @prop()
     def psf_spline_coeffs(self):
         """Return spline coefficients for PSF model."""
+        return None
+
+    @prop()
+    def psf_3d_xtangents(self):
+        """Return spline x tangents for PSF 3D model."""
+        return None
+
+    @prop()
+    def psf_3d_ytangents(self):
+        """Return spline y tangents for PSF 3D model."""
+        return None
+
+    @prop()
+    def psf_3d_ztangents(self):
+        """Return spline z tangents for PSF 3D model."""
+        return None
+
+    @prop()
+    def psf_3d_spline_coeffs(self):
+        """Return spline coefficients for PSF 3D model."""
         return None
 
     @prop()
@@ -322,16 +346,17 @@ class Channel:
     @fit_model.setter
     def fit_model(self, value):
         """Set the fitting model name."""
+        value = str(value).lower()
         if value not in ["isogauss", "gauss", "spline"]:
             raise ValueError(f"{value} fitting model not recognized")
-        self._fit_model = str(value).lower()
+        self._fit_model = value
 
     @prop()
     def fit_init(self):
         """Return initial values for fitting based on model."""
         match self.fit_model:
             case "isogauss":
-                return {"sig": self.psf_sigmas_nm}
+                return {"sig": self.psf_sigma_nm}
             case "gauss":
                 return {
                     "sigx": self.psf_xsigma_nm,
@@ -341,10 +366,10 @@ class Channel:
                 }
             case "spline":
                 return {
-                    "tx": self.psf_xtangent,
-                    "ty": self.psf_ytangent,
-                    "tz": self.psf_ztangent,
-                    "coeffs": self.psf_coeff,
+                    "tx": self.psf_3d_xtangents,
+                    "ty": self.psf_3d_ytangents,
+                    "tz": self.psf_3d_ztangents,
+                    "coeffs": self.psf_3d_spline_coeffs,
                 }
             case _:
                 raise ValueError(

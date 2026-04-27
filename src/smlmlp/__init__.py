@@ -21,6 +21,7 @@ sources = {
 'computer': 'smlmlp.modules.computer_LP.computer',
 'dataframes': 'smlmlp.modules.dataframes_LP.dataframes',
 'simulation': 'smlmlp.modules.simulation_LP.simulation',
+'start_server': 'smlmlp.modules.start_server_LP.start_server',
 'Camera': 'smlmlp.modules.Config_LP._functions.Camera',
 'metadatum': 'smlmlp.modules.Config_LP._functions.metadatum',
 'Channel': 'smlmlp.modules.Config_LP._functions.Channel',
@@ -87,6 +88,7 @@ sources = {
 'locs_individual_gaussfit': 'smlmlp.modules.block_LP._functions.localization.locs_individual_gaussfit',
 'locs_individual_splinefit': 'smlmlp.modules.block_LP._functions.localization.locs_individual_splinefit',
 'locs_individual_isogaussfit': 'smlmlp.modules.block_LP._functions.localization.locs_individual_isogaussfit',
+'locs_individual_fit': 'smlmlp.modules.block_LP._functions.localization.locs_individual_fit',
 'locs_individual_barycenter': 'smlmlp.modules.block_LP._functions.localization.locs_individual_barycenter',
 'blink_spatial_psf': 'smlmlp.modules.block_LP._functions.blink.blink_spatial_psf',
 'blink_temporal_on': 'smlmlp.modules.block_LP._functions.blink.blink_temporal_on',
@@ -94,11 +96,13 @@ sources = {
 'detect_gain': 'smlmlp.modules.block_LP._functions.detection.detect_gain',
 'detect_snr': 'smlmlp.modules.block_LP._functions.detection.detect_snr',
 'column': 'smlmlp.modules.columns_LP._functions.column',
+'RessourceClient': 'smlmlp.modules.computer_LP._functions.RessourceClient',
 'BaseDataFrame': 'smlmlp.modules.dataframes_LP._functions.BaseDataFrame',
 'MainDataFrame': 'smlmlp.modules.dataframes_LP._functions.MainDataFrame',
 'DetsDataFrame': 'smlmlp.modules.dataframes_LP._functions.DetsDataFrame',
 'LocsReceiver': 'smlmlp.modules.dataframes_LP._functions.LocsReceiver',
-'DataFrame': 'smlmlp.modules.dataframes_LP._functions.DataFrame'
+'DataFrame': 'smlmlp.modules.dataframes_LP._functions.DataFrame',
+'ResourceServer': 'smlmlp.modules.start_server_LP._functions.ResourceServer'
 }
 
 

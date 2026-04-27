@@ -11,6 +11,8 @@ import numpy as np
 import numba as nb
 from numba import cuda as nb_cuda
 
+BARYCENTER_GPU_MAX_THREADS = 256
+
 
 
 @block()
@@ -82,6 +84,7 @@ def locs_individual_barycenter(
         n_channels,
     )
 
+    cuda = bool(cuda)
     xp = get_xp(cuda)
     mux_all = []
     muy_all = []
@@ -94,8 +97,16 @@ def locs_individual_barycenter(
         mux = xp.empty_like(x0, dtype=xp.float32)
         muy = xp.empty_like(y0, dtype=xp.float32)
 
+        if len(crop) == 0:
+            if cuda:
+                mux = xp.asnumpy(mux)
+                muy = xp.asnumpy(muy)
+            mux_all.append(mux)
+            muy_all.append(muy)
+            continue
+
         if cuda:
-            threads_per_block = 128
+            threads_per_block = _barycenter_gpu_threads(crop.shape[1], crop.shape[2])
             blocks_per_grid = len(crop)
             barycenter_gpu[blocks_per_grid, threads_per_block](crop, mux, muy)
         else:
@@ -142,6 +153,16 @@ def _normalize_channels_pixels_nm(channels_pixels_nm, n_channels):
 
 
 
+def _barycenter_gpu_threads(height, width):
+    """Return a power-of-two CUDA block size for one crop reduction."""
+    n_pixels = max(1, min(int(height) * int(width), BARYCENTER_GPU_MAX_THREADS))
+    threads = 32
+    while threads < n_pixels:
+        threads *= 2
+    return threads
+
+
+
 @nb.njit(fastmath=True, cache=True, nogil=True, parallel=True)
 def barycenter_cpu(crop, mux, muy):
     """Compute intensity barycenters on CPU for one crop stack."""
@@ -170,7 +191,48 @@ def barycenter_cpu(crop, mux, muy):
 
 @nb_cuda.jit(fastmath=True, cache=True)
 def barycenter_gpu(crop, mux, muy):
-    """GPU kernel placeholder matching the CPU barycenter interface."""
+    """Compute intensity barycenters on GPU for one crop stack."""
     i = nb_cuda.blockIdx.x
     t = nb_cuda.threadIdx.x
     bdim = nb_cuda.blockDim.x
+    height = crop.shape[1]
+    width = crop.shape[2]
+    npixels = height * width
+
+    xnum_cache = nb_cuda.shared.array(BARYCENTER_GPU_MAX_THREADS, dtype=nb.float32)
+    ynum_cache = nb_cuda.shared.array(BARYCENTER_GPU_MAX_THREADS, dtype=nb.float32)
+    denom_cache = nb_cuda.shared.array(BARYCENTER_GPU_MAX_THREADS, dtype=nb.float32)
+
+    xnum = 0.0
+    ynum = 0.0
+    denom = 0.0
+    for pixel_index in range(t, npixels, bdim):
+        y = pixel_index // width
+        x = pixel_index - y * width
+        value = crop[i, y, x]
+        xnum += x * value
+        ynum += y * value
+        denom += value
+
+    xnum_cache[t] = xnum
+    ynum_cache[t] = ynum
+    denom_cache[t] = denom
+    nb_cuda.syncthreads()
+
+    stride = bdim // 2
+    while stride > 0:
+        if t < stride:
+            xnum_cache[t] += xnum_cache[t + stride]
+            ynum_cache[t] += ynum_cache[t + stride]
+            denom_cache[t] += denom_cache[t + stride]
+        nb_cuda.syncthreads()
+        stride //= 2
+
+    if t == 0:
+        denom = denom_cache[0]
+        if denom > 0.0:
+            mux[i] = xnum_cache[0] / denom
+            muy[i] = ynum_cache[0] / denom
+        else:
+            mux[i] = (width - 1) / 2.0
+            muy[i] = (height - 1) / 2.0
