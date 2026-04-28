@@ -1090,7 +1090,7 @@ def test_locs_individual_gaussfit():
     )
 
     assert mux.shape == muy.shape
-    assert sorted(info) == ["amp", "offset", "sigmax", "sigmay"]
+    assert sorted(info) == ["amp", "converged", "offset", "sigmax", "sigmay"]
 
 
 # %% test locs_individual_isogaussfit
@@ -1114,7 +1114,7 @@ def test_locs_individual_isogaussfit():
     )
 
     assert mux.shape == muy.shape
-    assert sorted(info) == ["amp", "offset", "sigma"]
+    assert sorted(info) == ["amp", "converged", "offset", "sigma"]
 
 
 # %% test locs_individual_splinefit
@@ -1188,7 +1188,7 @@ def test_locs_individual_splinefit(monkeypatch):
     np.testing.assert_allclose(muz, [0.0, 0.0])
     np.testing.assert_allclose(info["amp"], [5.0, 5.0])
     np.testing.assert_allclose(info["offset"], [5.0, 5.0])
-    assert sorted(info) == ["amp", "offset"]
+    assert sorted(info) == ["amp", "converged", "offset"]
     assert calls == [4]
 
 

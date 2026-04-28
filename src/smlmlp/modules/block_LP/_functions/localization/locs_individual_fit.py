@@ -9,7 +9,7 @@ import numpy as np
 from arrlp import coordinates, get_xp, nb_threads
 from funclp import Gaussian2D, IsoGaussian, LM, LSE, MLE, Normal, Poisson, Spline3D
 
-from smlmlp import block
+from smlmlp import block, locs_individual_barycenter
 from ._channel_values import split_channel_origins, stack_channel_values
 
 SIGMA = 0.21 * 670 / 1.5
@@ -149,7 +149,7 @@ def locs_individual_fit(
     """
     # Split origins by channel
     n_channels = len(crops)
-    X0, Y0, positions = split_channel_origins(crops, X0, Y0, ch, cuda=cuda)
+    X0_input, Y0_input = X0, Y0
 
     # Normalize per-channel parameters
     channels_fit_models = _normalize_channels_fit_models(channels_fit_models, n_channels)
@@ -177,6 +177,18 @@ def locs_individual_fit(
         channels_psf_3d_spline_coeffs, n_channels, "channels_psf_3d_spline_coeffs", required=needs_spline,
     )
 
+    X0, Y0, positions = split_channel_origins(crops, X0_input, Y0_input, ch, cuda=cuda)
+    bary_x, bary_y, _ = locs_individual_barycenter(
+        crops,
+        X0_input,
+        Y0_input,
+        ch=ch,
+        channels_pixels_nm=channels_pixels_nm,
+        cuda=cuda,
+        parallel=parallel,
+    )
+    bary_x, bary_y, _ = split_channel_origins(crops, bary_x, bary_y, ch, cuda=cuda)
+
     # Resolve optimizer and estimator
     optimizer_cls = _resolve_optimizer(optimizer)
     distribution = _resolve_distribution(distribution)
@@ -186,10 +198,11 @@ def locs_individual_fit(
     # Initialize output containers
     mux_all, muy_all, amp_all, offset_all = [], [], [], []
     sigma_all, sigmax_all, sigmay_all, muz_all = [], [], [], []
+    converged_all = []
 
     # Iterate over channels
-    for crop, x0, y0, pixel, gain, qe, model, sigma, sigx, sigy, theta, fit_theta, tx, ty, tz, coeffs in zip(
-        crops, X0, Y0, channels_pixels_nm, channels_gains, channels_QE, channels_fit_models,
+    for crop, x0, y0, bary_x_ch, bary_y_ch, pixel, gain, qe, model, sigma, sigx, sigy, theta, fit_theta, tx, ty, tz, coeffs in zip(
+        crops, X0, Y0, bary_x, bary_y, channels_pixels_nm, channels_gains, channels_QE, channels_fit_models,
         channels_psf_sigmas_nm, channels_psf_xsigmas_nm, channels_psf_ysigmas_nm, channels_psf_thetas_deg,
         channels_fit_thetas, channels_psf_3d_xtangents, channels_psf_3d_ytangents, channels_psf_3d_ztangents,
         channels_psf_3d_spline_coeffs,
@@ -214,11 +227,24 @@ def locs_individual_fit(
             sigma_all.append(empty)
             sigmax_all.append(empty)
             sigmay_all.append(empty)
+            converged_all.append(xp.empty(0, dtype=xp.int8))
             continue
 
         # Initialize fit parameters
-        mux = xp.full_like(x0, fill_value=(width - 1) / 2 * pixel[1])
-        muy = xp.full_like(y0, fill_value=(height - 1) / 2 * pixel[0])
+        center_x = (width - 1) / 2 * pixel[1]
+        center_y = (height - 1) / 2 * pixel[0]
+        mux_min = center_x - 1.5 * pixel[1]
+        mux_max = center_x + 1.5 * pixel[1]
+        muy_min = center_y - 1.5 * pixel[0]
+        muy_max = center_y + 1.5 * pixel[0]
+        bary_x_ch = xp.asarray(bary_x_ch)
+        bary_y_ch = xp.asarray(bary_y_ch)
+        mux = bary_x_ch - x0
+        muy = bary_y_ch - y0
+        mux = xp.where(xp.isfinite(mux), mux, center_x)
+        muy = xp.where(xp.isfinite(muy), muy, center_y)
+        mux = xp.clip(mux, mux_min, mux_max)
+        muy = xp.clip(muy, muy_min, muy_max)
         amp = xp.max(crop, axis=(1, 2))
         offset = xp.min(crop, axis=(1, 2))
 
@@ -228,6 +254,18 @@ def locs_individual_fit(
             pixel=pixel, sigma=sigma, sigx=sigx, sigy=sigy, theta=theta, fit_theta=fit_theta,
             tx=tx, ty=ty, tz=tz, coeffs=coeffs, cuda=cuda,
         )
+        function.mux_min = mux_min
+        function.mux_max = mux_max
+        function.muy_min = muy_min
+        function.muy_max = muy_max
+        if model == "isogauss":
+            function.sig_min = SIGMA / 3
+            function.sig_max = SIGMA * 3
+        if model == "gauss":
+            function.sigx_min = SIGMA / 3
+            function.sigx_max = SIGMA * 3
+            function.sigy_min = SIGMA / 3
+            function.sigy_max = SIGMA * 3
 
         # Run optimizer and collect results
         fit = optimizer_cls(function, estimator)
@@ -246,6 +284,7 @@ def locs_individual_fit(
                 with nb_threads(parallel):
                     fit(crop, xx, yy)
             muz = xp.full_like(x0, fill_value=np.nan, dtype=xp.float32)
+        converged = getattr(fit, "converged", xp.zeros(len(crop), dtype=xp.int8))
 
         # Transform to global coordinates and apply gains
         mux = function.mux + x0
@@ -259,12 +298,14 @@ def locs_individual_fit(
             muz = xp.asnumpy(muz)
             amp = xp.asnumpy(amp)
             offset = xp.asnumpy(offset)
+            converged = xp.asnumpy(converged)
 
         mux_all.append(mux)
         muy_all.append(muy)
         muz_all.append(muz)
         amp_all.append(amp)
         offset_all.append(offset)
+        converged_all.append(converged)
 
         # Compute sigma values per model
         nan_sigma = xp.full_like(x0, fill_value=np.nan, dtype=xp.float32)
@@ -296,6 +337,7 @@ def locs_individual_fit(
         "sigma": stack_channel_values(sigma_all, positions),
         "sigmax": stack_channel_values(sigmax_all, positions),
         "sigmay": stack_channel_values(sigmay_all, positions),
+        "converged": stack_channel_values(converged_all, positions),
         "models": channels_fit_models,
     }
 
