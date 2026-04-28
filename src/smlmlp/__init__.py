@@ -90,6 +90,7 @@ sources = {
 'locs_individual_fit': 'smlmlp.modules.block_LP._functions.localization.locs_individual_fit',
 'locs_individual_isogaussfit': 'smlmlp.modules.block_LP._functions.localization.locs_individual_isogaussfit',
 'locs_individual_barycenter': 'smlmlp.modules.block_LP._functions.localization.locs_individual_barycenter',
+'integrate_crop': 'smlmlp.modules.block_LP._functions.integrate.integrate_crop',
 'blink_spatial_psf': 'smlmlp.modules.block_LP._functions.blink.blink_spatial_psf',
 'blink_temporal_on': 'smlmlp.modules.block_LP._functions.blink.blink_temporal_on',
 'detect_spatial_maxima': 'smlmlp.modules.block_LP._functions.detection.detect_spatial_maxima',

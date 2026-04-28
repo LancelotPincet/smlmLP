@@ -64,6 +64,7 @@ Integrate
 .. toctree::
    :maxdepth: 1
 
+   integrate_crop
 
 Loading
 -------
