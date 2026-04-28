@@ -44,6 +44,7 @@ def test_column_fill_metadata_is_available_on_dataframes():
     assert dataframes["detections"].det_fill == 0
     assert dataframes["points"].pnt_fill == 0
     assert dataframes["detections"].intensity_fill == 0
+    assert dataframes["detections"].close_borders_fill == 1
     assert np.isnan(dataframes["points"].x_fill)
     assert np.isnan(dataframes["detections"].x_fill)
 
@@ -232,6 +233,35 @@ def test_dynamic_zernike_columns_are_registered_once():
     assert locs.detections.zernike_01_fill == 0
     assert "zernike 01" in locs.detections.head2save
     np.testing.assert_allclose(locs.detections.zernike_01, np.zeros(locs.ndetections))
+
+
+def test_close_borders_is_vectorized_per_channel_shapes():
+    """close_borders uses channel image sizes without row-wise Python loops."""
+
+    class FakeDetections(SimpleNamespace):
+        """Minimal object implementing len for descriptor testing."""
+
+        def __len__(self):
+            """Return row count."""
+            return len(self.x_det)
+
+    fake = FakeDetections(
+        x_det=np.array([5.0, 0.0, 10.0, 11.0, 7.0, 7.0, 3.0, np.nan], dtype=np.float32),
+        y_det=np.array([5.0, 5.0, 8.0, 5.0, 6.0, 7.0, 3.0, 1.0], dtype=np.float32),
+        x_cropshape=np.full(8, 3.0, dtype=np.float32),
+        y_cropshape=np.full(8, 3.0, dtype=np.float32),
+        x_pixel=np.ones(8, dtype=np.float32),
+        y_pixel=np.ones(8, dtype=np.float32),
+        ch=np.array([1, 1, 1, 1, 2, 2, 3, 1], dtype=np.uint8),
+        locs=SimpleNamespace(config=SimpleNamespace(channels_npixels=[(10, 12), (8, 9)])),
+    )
+
+    close_borders = dataframes["detections"].columns_dict["close_borders"].func(fake)
+
+    np.testing.assert_array_equal(
+        close_borders,
+        np.array([True, False, True, False, True, False, False, False]),
+    )
 
 
 # %% test blink columns

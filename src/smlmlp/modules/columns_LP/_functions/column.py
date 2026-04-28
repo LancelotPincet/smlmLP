@@ -23,7 +23,7 @@ class column:
         Possible file headers for this column. The first one is the canonical header.
     dtype : type
         Numpy dtype used when assigning this column.
-    fill : {0, numpy.nan}
+    fill : scalar or numpy.nan
         Fill value used for missing values of this logical column.
     save : bool, default=True
         Whether this column should be saved.
@@ -41,8 +41,8 @@ class column:
     -----
     The descriptor registers each logical column globally, maps all accepted headers
     to the same descriptor, and installs lazy accessors on the dataframe classes.
-    The fill metadata is exposed as ``<col>_fill`` on dataframe instances and is
-    limited to ``0`` or ``numpy.nan`` so missing-value behavior stays explicit.
+    The fill metadata is exposed as ``<col>_fill`` on dataframe instances.
+    It accepts finite scalar values or ``numpy.nan``.
 
     Examples
     --------
@@ -65,11 +65,15 @@ class column:
 
     def _normalize_fill(self, fill):
         """Validate and normalize fill metadata."""
-        if isinstance(fill, (int, float, np.integer, np.floating)) and fill == 0:
-            return 0
         if isinstance(fill, (float, np.floating)) and np.isnan(fill):
             return np.nan
-        raise ValueError("column fill must be 0 or np.nan")
+        if isinstance(fill, (bool, np.bool_)):
+            return int(fill)
+        if isinstance(fill, (int, float, np.integer, np.floating)):
+            if not np.isfinite(fill):
+                raise ValueError("column fill must be a finite scalar or np.nan")
+            return int(fill) if float(fill).is_integer() else float(fill)
+        raise ValueError("column fill must be a finite scalar or np.nan")
 
     def __call__(self, func):
         """Decorator entry point."""

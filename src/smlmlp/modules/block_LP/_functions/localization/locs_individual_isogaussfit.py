@@ -200,16 +200,18 @@ def locs_individual_isogaussfit(
 
         center_x = (width - 1) / 2 * pixel[1]
         center_y = (height - 1) / 2 * pixel[0]
-        mux_min = center_x - 1.5 * pixel[1]
-        mux_max = center_x + 1.5 * pixel[1]
-        muy_min = center_y - 1.5 * pixel[0]
-        muy_max = center_y + 1.5 * pixel[0]
         bary_x_ch = xp.asarray(bary_x_ch)
         bary_y_ch = xp.asarray(bary_y_ch)
-        mux = bary_x_ch - x0
-        muy = bary_y_ch - y0
-        mux = xp.where(xp.isfinite(mux), mux, center_x)
-        muy = xp.where(xp.isfinite(muy), muy, center_y)
+        mux_center = bary_x_ch - x0
+        muy_center = bary_y_ch - y0
+        mux_center = xp.where(xp.isfinite(mux_center), mux_center, center_x)
+        muy_center = xp.where(xp.isfinite(muy_center), muy_center, center_y)
+        mux_min = mux_center - 1.5 * pixel[1]
+        mux_max = mux_center + 1.5 * pixel[1]
+        muy_min = muy_center - 1.5 * pixel[0]
+        muy_max = muy_center + 1.5 * pixel[0]
+        mux = mux_center
+        muy = muy_center
         mux = xp.clip(mux, mux_min, mux_max)
         muy = xp.clip(muy, muy_min, muy_max)
         amp = xp.max(crop, axis=(1, 2))

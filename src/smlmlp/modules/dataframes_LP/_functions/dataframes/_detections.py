@@ -173,10 +173,80 @@ class detections(MainDataFrame) :
         """Return explicit fit iteration count."""
         return None
 
-    @column(headers=['converged'], dtype=np.bool_, fill=0, save=True, agg='min')
+    @column(headers=['converged'], dtype=np.int8, fill=0, save=True, agg='min')
     def converged(self) :
-        """Return explicit convergence flags."""
+        """Return explicit convergence quality codes."""
         return None
+
+
+
+    # Filters
+
+    @column(headers=['close borders'], dtype=np.bool_, fill=1, save=False, agg='min')
+    def close_borders(self) :
+        """Return True when the rounded crop stays fully inside the image."""
+        if len(self) == 0 : return None
+        if self.x_det is None or self.y_det is None : return None
+        if self.x_cropshape is None or self.y_cropshape is None : return None
+        if self.x_pixel is None or self.y_pixel is None : return None
+
+        try:
+            channels_npixels = self.locs.config.channels_npixels
+        except Exception:
+            return None
+        if channels_npixels is None:
+            return None
+
+        heights = np.asarray(
+            [shape[0] if shape is not None and len(shape) >= 2 else np.nan for shape in channels_npixels],
+            dtype=np.float32,
+        )
+        widths = np.asarray(
+            [shape[1] if shape is not None and len(shape) >= 2 else np.nan for shape in channels_npixels],
+            dtype=np.float32,
+        )
+        if heights.size == 0 or widths.size == 0:
+            return None
+
+        ch = np.asarray(self.ch, dtype=np.int32)
+        valid = np.isfinite(self.x_det) & np.isfinite(self.y_det)
+        valid &= np.isfinite(self.x_cropshape) & np.isfinite(self.y_cropshape)
+        valid &= np.isfinite(self.x_pixel) & np.isfinite(self.y_pixel)
+        valid &= (self.x_pixel > 0) & (self.y_pixel > 0)
+        valid &= (ch >= 1) & (ch <= heights.size)
+
+        x_half = (np.rint(self.x_cropshape).astype(np.int32) - 1) // 2
+        y_half = (np.rint(self.y_cropshape).astype(np.int32) - 1) // 2
+
+        inside = np.zeros(len(self), dtype=np.bool_)
+        if not np.any(valid):
+            return inside
+
+        x_pix = np.zeros(len(self), dtype=np.int32)
+        y_pix = np.zeros(len(self), dtype=np.int32)
+        x_pix[valid] = np.rint(self.x_det[valid] / self.x_pixel[valid]).astype(np.int32)
+        y_pix[valid] = np.rint(self.y_det[valid] / self.y_pixel[valid]).astype(np.int32)
+
+        channel_idx = ch[valid] - 1
+        valid_heights = heights[channel_idx]
+        valid_widths = widths[channel_idx]
+        finite_shape = np.isfinite(valid_heights) & np.isfinite(valid_widths)
+        if not np.any(finite_shape):
+            return inside
+
+        valid_idx = np.flatnonzero(valid)
+        idx = valid_idx[finite_shape]
+        height = valid_heights[finite_shape].astype(np.int32)
+        width = valid_widths[finite_shape].astype(np.int32)
+
+        inside[idx] = (
+            (x_pix[idx] - x_half[idx] >= 0)
+            & (x_pix[idx] + x_half[idx] < width)
+            & (y_pix[idx] - y_half[idx] >= 0)
+            & (y_pix[idx] + y_half[idx] < height)
+        )
+
+        return inside
 
 
 
