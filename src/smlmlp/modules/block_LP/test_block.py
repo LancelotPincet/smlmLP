@@ -521,10 +521,13 @@ def test_crop_individual_extract():
 
     assert len(crops) == 1
     assert len(crops[0]) == 3
-    assert np.issubdtype(X0[0].dtype, np.signedinteger)
-    assert np.issubdtype(Y0[0].dtype, np.signedinteger)
-    assert X0[0][0] < 0
-    assert Y0[0][0] < 0
+    assert X0.shape == (3,)
+    assert Y0.shape == (3,)
+    assert np.issubdtype(X0.dtype, np.signedinteger)
+    assert np.issubdtype(Y0.dtype, np.signedinteger)
+    assert X0[0] < 0
+    assert Y0[0] < 0
+    np.testing.assert_array_equal(info["ch"], [1, 1, 1])
 
 
 def test_crop_individual_extract_one_based_channels():
@@ -537,11 +540,11 @@ def test_crop_individual_extract_one_based_channels():
         np.ones((3, 16, 16), dtype=np.float32) * 2,
     ]
     fr = np.array([1, 1])
-    x = np.array([800.0, 800.0])
-    y = np.array([800.0, 800.0])
-    ch = np.array([1, 2], dtype=np.uint8)
+    x = np.array([800.0, 600.0])
+    y = np.array([800.0, 600.0])
+    ch = np.array([2, 1], dtype=np.uint8)
 
-    crops, _, _, _ = crop_individual_extract(
+    crops, X0, Y0, info = crop_individual_extract(
         channels,
         fr,
         x,
@@ -554,6 +557,9 @@ def test_crop_individual_extract_one_based_channels():
     assert len(crops) == 2
     np.testing.assert_allclose(crops[0], 1.0)
     np.testing.assert_allclose(crops[1], 2.0)
+    np.testing.assert_array_equal(X0, [7, 5])
+    np.testing.assert_array_equal(Y0, [7, 5])
+    np.testing.assert_array_equal(info["ch"], ch)
 
 
 def test_crop_individual_extract_rejects_zero_based_channels():
@@ -571,6 +577,29 @@ def test_crop_individual_extract_rejects_zero_based_channels():
             np.array([400.0]),
             ch=np.array([0], dtype=np.uint8),
         )
+
+
+def test_crop_individual_extract_keeps_empty_channel_stacks():
+    from smlmlp.modules.block_LP._functions.crop.crop_individual_extract import (
+        crop_individual_extract,
+    )
+
+    channels = [np.ones((1, 8, 8), dtype=np.float32), np.ones((1, 8, 8), dtype=np.float32) * 2]
+    crops, X0, Y0, info = crop_individual_extract(
+        channels,
+        np.array([1]),
+        np.array([400.0]),
+        np.array([400.0]),
+        ch=np.array([2], dtype=np.uint8),
+        channels_crops_pix=3,
+        channels_pixels_nm=100.0,
+    )
+
+    assert crops[0].shape == (0, 3, 3)
+    assert crops[1].shape == (1, 3, 3)
+    np.testing.assert_array_equal(X0, [3])
+    np.testing.assert_array_equal(Y0, [3])
+    np.testing.assert_array_equal(info["ch"], [2])
 
 
 # %% test crop_remove_bkgd
@@ -876,8 +905,8 @@ def test_globloc_fit_gauss():
     )
 
     crops = [np.random.rand(2, 7, 7).astype(np.float32)]
-    x0 = [np.array([10, 20], dtype=np.float32)]
-    y0 = [np.array([30, 40], dtype=np.float32)]
+    x0 = np.array([10, 20], dtype=np.float32)
+    y0 = np.array([30, 40], dtype=np.float32)
     models = ["gauss"]
     inits = [{"sigx": 90.0, "sigy": 90.0, "theta": 0.0, "theta_fit": False}]
 
@@ -897,8 +926,8 @@ def test_globloc_fit_isogauss():
     )
 
     crops = [np.random.rand(2, 7, 7).astype(np.float32)]
-    x0 = [np.array([10, 20], dtype=np.float32)]
-    y0 = [np.array([30, 40], dtype=np.float32)]
+    x0 = np.array([10, 20], dtype=np.float32)
+    y0 = np.array([30, 40], dtype=np.float32)
     models = ["isogauss"]
     inits = [{"sig": 90.0}]
 
@@ -990,16 +1019,9 @@ def test_locs_individual_fit_dispatches_channel_models(monkeypatch):
     monkeypatch.setattr(module, "Spline3D", _FakeSpline3D)
 
     crops = [np.full((1, 3, 3), i + 1, dtype=np.float32) for i in range(3)]
-    x0 = [
-        np.array([10.0], dtype=np.float32),
-        np.array([20.0], dtype=np.float32),
-        np.array([30.0], dtype=np.float32),
-    ]
-    y0 = [
-        np.array([100.0], dtype=np.float32),
-        np.array([200.0], dtype=np.float32),
-        np.array([300.0], dtype=np.float32),
-    ]
+    x0 = np.array([30.0, 10.0, 20.0], dtype=np.float32)
+    y0 = np.array([300.0, 100.0, 200.0], dtype=np.float32)
+    ch = np.array([3, 1, 2], dtype=np.uint8)
     tx = [np.linspace(-1.0, 1.0, 8, dtype=np.float32) for _ in range(3)]
     ty = [np.linspace(-1.0, 1.0, 8, dtype=np.float32) for _ in range(3)]
     tz = [np.linspace(-1.0, 1.0, 8, dtype=np.float32) for _ in range(3)]
@@ -1009,6 +1031,7 @@ def test_locs_individual_fit_dispatches_channel_models(monkeypatch):
         crops,
         x0,
         y0,
+        ch=ch,
         channels_fit_models=["isogauss", "gauss", "spline"],
         channels_pixels_nm=[(1.0, 1.0), (1.0, 1.0), (1.0, 1.0)],
         channels_psf_sigmas_nm=[2.0, 2.0, 2.0],
@@ -1020,14 +1043,14 @@ def test_locs_individual_fit_dispatches_channel_models(monkeypatch):
         channels_psf_3d_spline_coeffs=coeffs,
     )
 
-    np.testing.assert_allclose(mux, [11.0, 21.0, 31.0])
-    np.testing.assert_allclose(muy, [101.0, 201.0, 301.0])
-    np.testing.assert_allclose(muz, [np.nan, np.nan, 0.0], equal_nan=True)
-    np.testing.assert_allclose(info["amp"], [1.0, 2.0, 3.0])
-    np.testing.assert_allclose(info["offset"], [1.0, 2.0, 3.0])
-    np.testing.assert_allclose(info["sigma"], [2.0, np.sqrt(12.0), np.nan], equal_nan=True)
-    np.testing.assert_allclose(info["sigmax"], [np.nan, 3.0, np.nan], equal_nan=True)
-    np.testing.assert_allclose(info["sigmay"], [np.nan, 4.0, np.nan], equal_nan=True)
+    np.testing.assert_allclose(mux, [31.0, 11.0, 21.0])
+    np.testing.assert_allclose(muy, [301.0, 101.0, 201.0])
+    np.testing.assert_allclose(muz, [0.0, np.nan, np.nan], equal_nan=True)
+    np.testing.assert_allclose(info["amp"], [3.0, 1.0, 2.0])
+    np.testing.assert_allclose(info["offset"], [3.0, 1.0, 2.0])
+    np.testing.assert_allclose(info["sigma"], [np.nan, 2.0, np.sqrt(12.0)], equal_nan=True)
+    np.testing.assert_allclose(info["sigmax"], [np.nan, np.nan, 3.0], equal_nan=True)
+    np.testing.assert_allclose(info["sigmay"], [np.nan, np.nan, 4.0], equal_nan=True)
     assert info["models"] == ["isogauss", "gauss", "spline"]
     assert calls == [("isogauss", 3), ("gauss", 3), ("spline", 4)]
 
@@ -1038,8 +1061,8 @@ def test_locs_individual_fit_rejects_unknown_model():
     )
 
     crops = [np.zeros((1, 3, 3), dtype=np.float32)]
-    x0 = [np.zeros(1, dtype=np.float32)]
-    y0 = [np.zeros(1, dtype=np.float32)]
+    x0 = np.zeros(1, dtype=np.float32)
+    y0 = np.zeros(1, dtype=np.float32)
 
     with pytest.raises(ValueError, match="channels_fit_models"):
         locs_individual_fit(crops, x0, y0, channels_fit_models=["bad"])
@@ -1048,15 +1071,14 @@ def test_locs_individual_fit_rejects_unknown_model():
 # %% test locs_individual_gaussfit
 
 
-@pytest.mark.skip(reason="source file has variable ordering bug")
 def test_locs_individual_gaussfit():
     from smlmlp.modules.block_LP._functions.localization.locs_individual_gaussfit import (
         locs_individual_gaussfit,
     )
 
     crops = [np.random.rand(2, 7, 7).astype(np.float32)]
-    x0 = [np.array([10, 20], dtype=np.float32)]
-    y0 = [np.array([30, 40], dtype=np.float32)]
+    x0 = np.array([10, 20], dtype=np.float32)
+    y0 = np.array([30, 40], dtype=np.float32)
 
     mux, muy, info = locs_individual_gaussfit(
         crops,
@@ -1080,8 +1102,8 @@ def test_locs_individual_isogaussfit():
     )
 
     crops = [np.random.rand(2, 7, 7).astype(np.float32)]
-    x0 = [np.array([10, 20], dtype=np.float32)]
-    y0 = [np.array([30, 40], dtype=np.float32)]
+    x0 = np.array([10, 20], dtype=np.float32)
+    y0 = np.array([30, 40], dtype=np.float32)
 
     mux, muy, info = locs_individual_isogaussfit(
         crops,
@@ -1143,8 +1165,8 @@ def test_locs_individual_splinefit(monkeypatch):
     monkeypatch.setattr(module, "Spline3D", _FakeSpline3D)
 
     crops = [np.full((2, 7, 7), 5.0, dtype=np.float32)]
-    x0 = [np.array([10, 20], dtype=np.float32)]
-    y0 = [np.array([30, 40], dtype=np.float32)]
+    x0 = np.array([10, 20], dtype=np.float32)
+    y0 = np.array([30, 40], dtype=np.float32)
     tx = [np.linspace(-1.0, 1.0, 8, dtype=np.float32)]
     ty = [np.linspace(-1.0, 1.0, 8, dtype=np.float32)]
     tz = [np.linspace(-0.5, 0.5, 8, dtype=np.float32)]
@@ -1179,8 +1201,8 @@ def test_locs_individual_barycenter():
     )
 
     crops = [np.random.rand(3, 5, 5).astype(np.float32)]
-    x0 = [np.array([10, 20, 30], dtype=np.float32)]
-    y0 = [np.array([5, 15, 25], dtype=np.float32)]
+    x0 = np.array([10, 20, 30], dtype=np.float32)
+    y0 = np.array([5, 15, 25], dtype=np.float32)
 
     mux, muy, info = locs_individual_barycenter(crops, x0, y0)
 
@@ -1193,13 +1215,47 @@ def test_locs_individual_barycenter_with_pixels():
     )
 
     crops = [np.random.rand(3, 5, 5).astype(np.float32)]
-    x0 = [np.array([10, 20, 30], dtype=np.float32)]
-    y0 = [np.array([5, 15, 25], dtype=np.float32)]
+    x0 = np.array([10, 20, 30], dtype=np.float32)
+    y0 = np.array([5, 15, 25], dtype=np.float32)
     pix = [(100.0, 120.0)]
 
     mux, muy, info = locs_individual_barycenter(crops, x0, y0, channels_pixels_nm=pix)
 
     assert mux.ndim == 1
+
+
+def test_locs_individual_barycenter_uses_channel_vector_order():
+    from smlmlp.modules.block_LP._functions.localization.locs_individual_barycenter import (
+        locs_individual_barycenter,
+    )
+
+    crops = [np.zeros((1, 3, 3), dtype=np.float32), np.zeros((1, 3, 3), dtype=np.float32)]
+    crops[0][0, 1, 1] = 1.0
+    crops[1][0, 1, 1] = 1.0
+    x0 = np.array([20.0, 10.0], dtype=np.float32)
+    y0 = np.array([200.0, 100.0], dtype=np.float32)
+    ch = np.array([2, 1], dtype=np.uint8)
+
+    mux, muy, _ = locs_individual_barycenter(crops, x0, y0, ch=ch)
+
+    np.testing.assert_allclose(mux, [21.0, 11.0])
+    np.testing.assert_allclose(muy, [201.0, 101.0])
+
+
+def test_locs_individual_barycenter_skips_empty_channels():
+    from smlmlp.modules.block_LP._functions.localization.locs_individual_barycenter import (
+        locs_individual_barycenter,
+    )
+
+    crops = [np.empty((0, 3, 3), dtype=np.float32), np.zeros((1, 3, 3), dtype=np.float32)]
+    crops[1][0, 1, 1] = 1.0
+    x0 = np.array([20.0], dtype=np.float32)
+    y0 = np.array([200.0], dtype=np.float32)
+
+    mux, muy, _ = locs_individual_barycenter(crops, x0, y0, ch=np.array([2], dtype=np.uint8))
+
+    np.testing.assert_allclose(mux, [21.0])
+    np.testing.assert_allclose(muy, [201.0])
 
 
 def test_locs_individual_barycenter_cuda_matches_cpu():
@@ -1213,8 +1269,8 @@ def test_locs_individual_barycenter_cuda_matches_cpu():
 
     rng = np.random.default_rng(0)
     crops = [rng.random((8, 15, 15), dtype=np.float32)]
-    x0 = [np.arange(-4, 4, dtype=np.int32)]
-    y0 = [np.arange(3, 11, dtype=np.int32)]
+    x0 = np.arange(-4, 4, dtype=np.int32)
+    y0 = np.arange(3, 11, dtype=np.int32)
     pix = [(108.0, 108.0)]
 
     cpu_x, cpu_y, _ = locs_individual_barycenter(

@@ -6,7 +6,7 @@
 
 
 from smlmlp import block
-from arrlp import sortloop, get_xp, nb_threads
+from arrlp import get_xp, nb_threads
 import numpy as np
 import numba as nb
 from numba import cuda as nb_cuda
@@ -59,8 +59,8 @@ def crop_individual_extract(
         A tuple ``(crops, X0, Y0, info)`` where:
 
         - ``crops`` is a list of arrays containing extracted crops per channel,
-        - ``X0`` is a list of x-origin pixel coordinates,
-        - ``Y0`` is a list of y-origin pixel coordinates,
+        - ``X0`` is a detection-aligned 1D vector of x-origin pixel coordinates,
+        - ``Y0`` is a detection-aligned 1D vector of y-origin pixel coordinates,
         - ``info`` is a dictionary containing reusable intermediate results.
 
         The dictionary contains the following keys:
@@ -70,7 +70,20 @@ def crop_individual_extract(
         ``'channels_pixels_nm'``
             Normalized per-channel pixel sizes.
         ``'argsort'``
-            Sorting indices applied to inputs before processing.
+            Identity indices kept for compatibility with blocks reading this field.
+        ``'ch'``
+            One-based detection-aligned channel indices used to order ``X0`` and ``Y0``.
+
+    Notes
+    -----
+    1. Missing channel labels are replaced by channel one when a single channel
+       is processed, and rejected otherwise.
+    2. Crop sizes and pixel sizes are normalized to one value per channel.
+    3. The function loops over every channel, extracts the detections where
+       ``ch`` matches that channel, and preserves their relative detection order.
+    4. Per-channel crop stacks are appended to ``crops`` while the corresponding
+       crop origins are written back into the global 1D ``X0`` and ``Y0`` vectors.
+    5. Crop pixels outside the image bounds are filled with zero.
 
     Examples
     --------
@@ -84,6 +97,8 @@ def crop_individual_extract(
     1
     >>> len(crops[0])
     3
+    >>> X0.shape
+    (3,)
     """
     assert fr.min() >= 1, (
         "Frame column starts at 1 by convention, please add 1 to your column frame before inserting it in this function"
@@ -131,33 +146,33 @@ def crop_individual_extract(
             for _ in range(len(channels))
         ]
 
-    # Sorting inputs for efficient grouped processing
+    # Cast inputs
     xp = get_xp(cuda)
     fr = xp.asarray(fr, dtype=xp.uint32)
     y = xp.asarray(y_det, dtype=xp.float32)
     x = xp.asarray(x_det, dtype=xp.float32)
     ch = xp.asarray(ch, dtype=xp.uint8)
+    if len(ch) != len(fr): raise ValueError("ch must have same length as fr")
 
+    # Validate channel indices
     if len(ch):
         _ch_min = int(ch.min().get() if hasattr(ch.min(), "get") else ch.min())
         _ch_max = int(ch.max().get() if hasattr(ch.max(), "get") else ch.max())
         if _ch_min < 1 or _ch_max > len(channels):
             raise ValueError("Channel indices must be one-based and within channels.")
-        ch = ch - 1
+    ch_zero = ch - 1
 
-    keys = xp.stack((x, y, fr, ch))
-    argsort = xp.lexsort(keys)
+    # Allocate outputs
+    crops = []
+    X0 = xp.empty(len(fr), dtype=xp.int32)
+    Y0 = xp.empty(len(fr), dtype=xp.int32)
 
-    fr = fr[argsort] - 1  # convert to 0-based indexing
-    y = y[argsort]
-    x = x[argsort]
-    ch = ch[argsort]
-
-    crops, X0, Y0 = [], [], []
-
-    # Loop over grouped channels
-    for _, ch_ch, ch_fr, ch_y, ch_x in sortloop(ch, fr, y, x, cuda=cuda):
-        channel = channels[ch_ch]
+    # Loop over channels
+    for ch_ch, channel in enumerate(channels):
+        positions = xp.nonzero(ch_zero == ch_ch)[0]
+        ch_fr = fr[positions] - 1  # convert to 0-based indexing
+        ch_y = y[positions]
+        ch_x = x[positions]
         pixel = channels_pixels_nm[ch_ch]
         width, height = channels_crops_pix[ch_ch]
 
@@ -167,30 +182,15 @@ def crop_individual_extract(
         x0_pix = xp.empty(n, dtype=np.int32)
         y0_pix = xp.empty(n, dtype=np.int32)
 
-        if cuda:
-            threads_per_block = (8, 8, 8)
-            blocks_per_grid = (
-                (n + threads_per_block[0] - 1) // threads_per_block[0],
-                (height + threads_per_block[1] - 1) // threads_per_block[1],
-                (width + threads_per_block[2] - 1) // threads_per_block[2],
-            )
-
-            crop_gpu[blocks_per_grid, threads_per_block](
-                channel,
-                crop,
-                ch_fr,
-                ch_x,
-                ch_y,
-                pixel[1],
-                pixel[0],
-                width,
-                height,
-                x0_pix,
-                y0_pix,
-            )
-        else:
-            with nb_threads(parallel):
-                crop_cpu(
+        if len(ch_fr):
+            if cuda:
+                threads_per_block = (8, 8, 8)
+                blocks_per_grid = (
+                    (n + threads_per_block[0] - 1) // threads_per_block[0],
+                    (height + threads_per_block[1] - 1) // threads_per_block[1],
+                    (width + threads_per_block[2] - 1) // threads_per_block[2],
+                )
+                crop_gpu[blocks_per_grid, threads_per_block](
                     channel,
                     crop,
                     ch_fr,
@@ -203,15 +203,31 @@ def crop_individual_extract(
                     x0_pix,
                     y0_pix,
                 )
+            else:
+                with nb_threads(parallel):
+                    crop_cpu(
+                        channel,
+                        crop,
+                        ch_fr,
+                        ch_x,
+                        ch_y,
+                        pixel[1],
+                        pixel[0],
+                        width,
+                        height,
+                        x0_pix,
+                        y0_pix,
+                    )
 
         crops.append(crop)
-        X0.append(x0_pix)
-        Y0.append(y0_pix)
+        X0[positions] = x0_pix
+        Y0[positions] = y0_pix
 
     info = {
         "channels_crops_pix": channels_crops_pix,
         "channels_pixels_nm": channels_pixels_nm,
-        "argsort": argsort,
+        "argsort": xp.arange(len(fr), dtype=xp.uint32),
+        "ch": ch,
     }
 
     return crops, X0, Y0, info

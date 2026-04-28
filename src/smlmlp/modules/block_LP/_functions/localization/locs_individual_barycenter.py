@@ -10,6 +10,7 @@ from arrlp import get_xp, nb_threads
 import numpy as np
 import numba as nb
 from numba import cuda as nb_cuda
+from ._channel_values import split_channel_origins, stack_channel_values
 
 BARYCENTER_GPU_MAX_THREADS = 256
 
@@ -21,6 +22,7 @@ def locs_individual_barycenter(
     X0,
     Y0,
     /,
+    ch=None,
     *,
     channels_pixels_nm=1.0,
     cuda=False,
@@ -37,10 +39,13 @@ def locs_individual_barycenter(
     ----------
     crops : sequence of array-like
         Sequence of crop stacks, one per channel, shaped ``(N, Y, X)``.
-    X0 : sequence of array-like
-        Sequence of x-origin pixel indices for each crop.
-    Y0 : sequence of array-like
-        Sequence of y-origin pixel indices for each crop.
+    X0 : array-like
+        Detection-aligned 1D vector of x-origin pixel indices.
+    Y0 : array-like
+        Detection-aligned 1D vector of y-origin pixel indices.
+    ch : array-like or None, optional
+        One-based channel index for each detection. Required when ``crops`` has
+        several channels.
     channels_pixels_nm : float or sequence, optional
         Pixel size specification. It can be a scalar, a ``(py, px)`` tuple,
         or a per-channel sequence.
@@ -54,8 +59,8 @@ def locs_individual_barycenter(
     tuple
         A tuple ``(mux, muy, info)`` where:
 
-        - ``mux`` is the concatenated x localization array in nanometers,
-        - ``muy`` is the concatenated y localization array in nanometers,
+        - ``mux`` is the detection-aligned x localization array in nanometers,
+        - ``muy`` is the detection-aligned y localization array in nanometers,
         - ``info`` is a dictionary containing reusable intermediate results.
 
         The dictionary contains the following keys:
@@ -63,12 +68,21 @@ def locs_individual_barycenter(
         ``'channels_pixels_nm'``
             Normalized per-channel pixel sizes used for coordinate conversion.
 
+    Notes
+    -----
+    1. ``ch`` is converted into per-channel positions and used to split ``X0``
+       and ``Y0`` so each origin vector matches the corresponding crop stack.
+    2. Each crop barycenter is computed in local pixel coordinates; zero-sum
+       crops fall back to the crop center.
+    3. Local barycenters are shifted by the crop origins, converted to
+       nanometers with the channel pixel size, and remapped to detection order.
+
     Examples
     --------
     >>> import numpy as np
     >>> crops = [np.random.rand(3, 5, 5).astype(np.float32)]
-    >>> x0 = [np.array([10, 20, 30], dtype=np.float32)]
-    >>> y0 = [np.array([5, 15, 25], dtype=np.float32)]
+    >>> x0 = np.array([10, 20, 30], dtype=np.float32)
+    >>> y0 = np.array([5, 15, 25], dtype=np.float32)
     >>> mux, muy, info = locs_individual_barycenter(crops, x0, y0)
     >>> mux.shape == muy.shape
     True
@@ -79,10 +93,8 @@ def locs_individual_barycenter(
     1
     """
     n_channels = len(crops)
-    channels_pixels_nm = _normalize_channels_pixels_nm(
-        channels_pixels_nm,
-        n_channels,
-    )
+    X0, Y0, positions = split_channel_origins(crops, X0, Y0, ch, cuda=cuda)
+    channels_pixels_nm = _normalize_channels_pixels_nm(channels_pixels_nm, n_channels)
 
     cuda = bool(cuda)
     xp = get_xp(cuda)
@@ -129,7 +141,7 @@ def locs_individual_barycenter(
         "channels_pixels_nm": channels_pixels_nm,
     }
 
-    return np.hstack(mux_all), np.hstack(muy_all), info
+    return stack_channel_values(mux_all, positions), stack_channel_values(muy_all, positions), info
 
 
 

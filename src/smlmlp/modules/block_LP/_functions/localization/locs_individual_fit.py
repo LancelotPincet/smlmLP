@@ -10,6 +10,7 @@ from arrlp import coordinates, get_xp, nb_threads
 from funclp import Gaussian2D, IsoGaussian, LM, LSE, MLE, Normal, Poisson, Spline3D
 
 from smlmlp import block
+from ._channel_values import split_channel_origins, stack_channel_values
 
 SIGMA = 0.21 * 670 / 1.5
 FIT_MODELS = ("isogauss", "gauss", "spline")
@@ -22,6 +23,7 @@ def locs_individual_fit(
     X0,
     Y0,
     /,
+    ch=None,
     *,
     channels_fit_models="isogauss",
     optimizer="lm",
@@ -50,10 +52,13 @@ def locs_individual_fit(
     crops : sequence of array-like
         Crop stacks to fit, one stack per channel. Each stack must be shaped
         ``(N, Y, X)`` where ``N`` is the number of events in that channel.
-    X0 : sequence of array-like
-        Crop x-origin pixel indices, one array per channel.
-    Y0 : sequence of array-like
-        Crop y-origin pixel indices, one array per channel.
+    X0 : array-like
+        Detection-aligned 1D vector of crop x-origin pixel indices.
+    Y0 : array-like
+        Detection-aligned 1D vector of crop y-origin pixel indices.
+    ch : array-like or None, optional
+        One-based channel index for each detection. Required when ``crops`` has
+        several channels.
     channels_fit_models : str or sequence of str, default="isogauss"
         Model used for each channel crop stack. Accepted values are
         ``"isogauss"``, ``"gauss"``, and ``"spline"``.
@@ -98,9 +103,9 @@ def locs_individual_fit(
     -------
     tuple
         A tuple ``(mux, muy, muz, info)`` where ``mux`` and ``muy`` are
-        concatenated fitted coordinates in nanometers and ``muz`` contains fitted
+        detection-aligned fitted coordinates in nanometers and ``muz`` contains fitted
         spline z coordinates or ``np.nan`` for 2D models. ``info`` contains
-        concatenated ``"amp"``, ``"offset"``, ``"sigma"``, ``"sigmax"``, and
+        detection-aligned ``"amp"``, ``"offset"``, ``"sigma"``, ``"sigmax"``, and
         ``"sigmay"`` arrays plus a ``"models"`` list. Sigma arrays always match
         the localization length and contain ``np.nan`` where the parameter does
         not apply to the channel model.
@@ -116,19 +121,21 @@ def locs_individual_fit(
 
     Notes
     -----
-    The function performs the same independent crop fitting as the specialized
-    individual fit blocks, but chooses the model separately for each crop stack.
-    ``"isogauss"`` uses :class:`funclp.IsoGaussian`, ``"gauss"`` uses
-    :class:`funclp.Gaussian2D`, and ``"spline"`` uses :class:`funclp.Spline3D`.
-    Coordinates are initialized at the crop center, fitted in local nanometer
-    coordinates, shifted by the crop origins, and concatenated in channel order.
+    1. Channel model names and per-channel parameters are normalized to match
+       the crop list length.
+    2. ``X0`` and ``Y0`` are split by ``ch`` so origins match each crop stack.
+    3. Each channel selects ``IsoGaussian``, ``Gaussian2D``, or ``Spline3D`` and
+       initializes local coordinates at the crop center.
+    4. The selected optimizer updates model parameters in local nanometer
+       coordinates before crop origins are added back.
+    5. Coordinates and fitted parameter arrays are remapped to detection order.
 
     Examples
     --------
     >>> import numpy as np
     >>> crops = [np.random.rand(2, 7, 7).astype(np.float32)]
-    >>> x0 = [np.array([10, 20], dtype=np.float32)]
-    >>> y0 = [np.array([30, 40], dtype=np.float32)]
+    >>> x0 = np.array([10, 20], dtype=np.float32)
+    >>> y0 = np.array([30, 40], dtype=np.float32)
     >>> mux, muy, muz, info = locs_individual_fit(
     ...     crops,
     ...     x0,
@@ -158,7 +165,7 @@ def locs_individual_fit(
     ['spline']
     """
     n_channels = len(crops)
-    _validate_channel_lengths(n_channels, X0=X0, Y0=Y0)
+    X0, Y0, positions = split_channel_origins(crops, X0, Y0, ch, cuda=cuda)
 
     channels_fit_models = _normalize_channels_fit_models(
         channels_fit_models,
@@ -273,6 +280,19 @@ def locs_individual_fit(
 
         x0 = xp.asarray(x0) * pixel[1]
         y0 = xp.asarray(y0) * pixel[0]
+
+        if len(crop) == 0:
+            empty = xp.empty(0, dtype=xp.float32)
+            mux_all.append(empty)
+            muy_all.append(empty)
+            muz_all.append(empty)
+            amp_all.append(empty)
+            offset_all.append(empty)
+            sigma_all.append(empty)
+            sigmax_all.append(empty)
+            sigmay_all.append(empty)
+            continue
+
         mux = xp.full_like(x0, fill_value=(width - 1) / 2 * pixel[1])
         muy = xp.full_like(y0, fill_value=(height - 1) / 2 * pixel[0])
         amp = xp.max(crop, axis=(1, 2))
@@ -355,23 +375,15 @@ def locs_individual_fit(
         sigmay_all.append(sigy)
 
     info = {
-        "amp": np.hstack(amp_all),
-        "offset": np.hstack(offset_all),
-        "sigma": np.hstack(sigma_all),
-        "sigmax": np.hstack(sigmax_all),
-        "sigmay": np.hstack(sigmay_all),
+        "amp": stack_channel_values(amp_all, positions),
+        "offset": stack_channel_values(offset_all, positions),
+        "sigma": stack_channel_values(sigma_all, positions),
+        "sigmax": stack_channel_values(sigmax_all, positions),
+        "sigmay": stack_channel_values(sigmay_all, positions),
         "models": channels_fit_models,
     }
 
-    return np.hstack(mux_all), np.hstack(muy_all), np.hstack(muz_all), info
-
-
-
-def _validate_channel_lengths(n_channels, **values):
-    """Validate values that must already be provided per channel."""
-    for name, value in values.items():
-        if len(value) != n_channels:
-            raise ValueError(f"{name} must have same length as crops")
+    return stack_channel_values(mux_all, positions), stack_channel_values(muy_all, positions), stack_channel_values(muz_all, positions), info
 
 
 

@@ -8,7 +8,7 @@
 from smlmlp import block
 from funclp import LM, MLE, LSE, Poisson, Normal, Spline3D
 from arrlp import get_xp, nb_threads, coordinates
-import numpy as np
+from ._channel_values import split_channel_origins, stack_channel_values
 
 SIGMA = 0.21 * 670 / 1.5
 
@@ -20,6 +20,7 @@ def locs_individual_splinefit(
     X0,
     Y0,
     /,
+    ch=None,
     *,
     optimizer="lm",
     estimator="mle",
@@ -45,10 +46,13 @@ def locs_individual_splinefit(
     ----------
     crops : sequence of array-like
         Sequence of crop stacks, one per channel, shaped ``(N, Y, X)``.
-    X0 : sequence of array-like
-        Sequence of x-origin pixel indices for each crop.
-    Y0 : sequence of array-like
-        Sequence of y-origin pixel indices for each crop.
+    X0 : array-like
+        Detection-aligned 1D vector of x-origin pixel indices.
+    Y0 : array-like
+        Detection-aligned 1D vector of y-origin pixel indices.
+    ch : array-like or None, optional
+        One-based channel index for each detection. Required when ``crops`` has
+        several channels.
     optimizer : str, optional
         Optimizer key.
     estimator : str, optional
@@ -79,24 +83,33 @@ def locs_individual_splinefit(
     tuple
         A tuple ``(mux, muy, muz, info)`` where:
 
-        - ``mux`` is the concatenated x localization array in nanometers,
-        - ``muy`` is the concatenated y localization array in nanometers,
-        - ``muz`` is the concatenated z localization array,
+        - ``mux`` is the detection-aligned x localization array in nanometers,
+        - ``muy`` is the detection-aligned y localization array in nanometers,
+        - ``muz`` is the detection-aligned z localization array,
         - ``info`` is a dictionary with fitted parameter arrays.
 
         ``info`` contains:
 
         ``'amp'``
-            Concatenated converted amplitudes.
+            Detection-aligned converted amplitudes.
         ``'offset'``
-            Concatenated converted offsets.
+            Detection-aligned converted offsets.
+
+    Notes
+    -----
+    1. ``X0`` and ``Y0`` are split by ``ch`` so each origin vector follows the
+       crop order inside its channel stack.
+    2. A local x/y grid and zero z grid are built for each channel, and spline
+       models are initialized at the crop center with zero z.
+    3. The optimizer updates local spline parameters, local coordinates are
+       shifted by crop origins, and all outputs are remapped to detection order.
 
     Examples
     --------
     >>> import numpy as np
     >>> crops = [np.random.rand(2, 7, 7).astype(np.float32)]
-    >>> x0 = [np.array([10, 20], dtype=np.float32)]
-    >>> y0 = [np.array([30, 40], dtype=np.float32)]
+    >>> x0 = np.array([10, 20], dtype=np.float32)
+    >>> y0 = np.array([30, 40], dtype=np.float32)
     >>> tx = [np.linspace(-1.0, 1.0, 5, dtype=np.float32)]
     >>> ty = [np.linspace(-1.0, 1.0, 5, dtype=np.float32)]
     >>> tz = [np.linspace(-0.5, 0.5, 5, dtype=np.float32)]
@@ -130,11 +143,9 @@ def locs_individual_splinefit(
     1
     """
     n_channels = len(crops)
+    X0, Y0, positions = split_channel_origins(crops, X0, Y0, ch, cuda=cuda)
 
-    channels_pixels_nm = _normalize_channels_pixels_nm(
-        channels_pixels_nm,
-        n_channels,
-    )
+    channels_pixels_nm = _normalize_channels_pixels_nm(channels_pixels_nm, n_channels)
     channels_gains = _normalize_channels_parameter(channels_gains, n_channels)
     channels_QE = _normalize_channels_parameter(channels_QE, n_channels)
 
@@ -204,6 +215,15 @@ def locs_individual_splinefit(
         x0 = xp.asarray(x0) * pixel[1]
         y0 = xp.asarray(y0) * pixel[0]
 
+        if len(crop) == 0:
+            empty = xp.empty(0, dtype=xp.float32)
+            mux_all.append(empty)
+            muy_all.append(empty)
+            muz_all.append(empty)
+            amp_all.append(empty)
+            offset_all.append(empty)
+            continue
+
         mux = xp.full_like(x0, fill_value=(width - 1) / 2 * pixel[1])
         muy = xp.full_like(y0, fill_value=(height - 1) / 2 * pixel[0])
         muz = xp.zeros_like(x0)
@@ -247,11 +267,11 @@ def locs_individual_splinefit(
         offset_all.append(offset)
 
     info = {
-        "amp": np.hstack(amp_all),
-        "offset": np.hstack(offset_all),
+        "amp": stack_channel_values(amp_all, positions),
+        "offset": stack_channel_values(offset_all, positions),
     }
 
-    return np.hstack(mux_all), np.hstack(muy_all), np.hstack(muz_all), info
+    return stack_channel_values(mux_all, positions), stack_channel_values(muy_all, positions), stack_channel_values(muz_all, positions), info
 
 
 
