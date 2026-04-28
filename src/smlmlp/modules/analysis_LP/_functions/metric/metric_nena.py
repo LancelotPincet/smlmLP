@@ -25,7 +25,7 @@ def metric_nena(
     *,
     association_radius_nm=30.0,
     z_association_radius_nm=100.0,
-    bins=100,
+    bins=101,
     cuda=False,
     parallel=False,
 ):
