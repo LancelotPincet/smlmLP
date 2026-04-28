@@ -7,6 +7,7 @@
 
 from smlmlp import block
 from arrlp import get_xp, nb_threads
+import warnings
 import bottleneck as bn
 import numba as nb
 from numba import cuda as nb_cuda
@@ -100,11 +101,23 @@ def crop_remove_bkgd(crops, /, *, cuda=False, parallel=False):
             blocks_per_grid = n_crops
 
             borders_gpu[blocks_per_grid, threads_per_block](crop, pad_mask, borders)
-            med = xp.nanmedian(borders, axis=1)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="All-NaN slice encountered",
+                    category=RuntimeWarning,
+                )
+                med = xp.nanmedian(borders, axis=1)
         else:
             with nb_threads(parallel):
                 borders_cpu(crop, pad_mask, borders)
-            med = bn.nanmedian(borders, axis=1)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="All-NaN slice encountered",
+                    category=RuntimeWarning,
+                )
+                med = bn.nanmedian(borders, axis=1)
 
         med = xp.where(xp.isnan(med), xp.float32(0.0), med)
         crop = crop - med[:, None, None]
