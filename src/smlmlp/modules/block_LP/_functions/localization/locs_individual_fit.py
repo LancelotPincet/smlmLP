@@ -19,29 +19,12 @@ FIT_MODELS = ("isogauss", "gauss", "spline")
 
 @block()
 def locs_individual_fit(
-    crops,
-    X0,
-    Y0,
-    /,
-    ch=None,
-    *,
-    channels_fit_models="isogauss",
-    optimizer="lm",
-    estimator="mle",
-    distribution="poisson",
-    channels_pixels_nm=1.0,
-    channels_gains=1.0,
-    channels_QE=1.0,
-    cuda=False,
-    parallel=False,
-    channels_psf_sigmas_nm=SIGMA,
-    channels_psf_xsigmas_nm=SIGMA,
-    channels_psf_ysigmas_nm=SIGMA,
-    channels_psf_thetas_deg=0.0,
-    channels_fit_thetas=False,
-    channels_psf_3d_xtangents=None,
-    channels_psf_3d_ytangents=None,
-    channels_psf_3d_ztangents=None,
+    crops, X0, Y0, /, ch=None, *,
+    channels_fit_models="isogauss", optimizer="lm", estimator="mle", distribution="poisson",
+    channels_pixels_nm=1.0, channels_gains=1.0, channels_QE=1.0, cuda=False, parallel=False,
+    channels_psf_sigmas_nm=SIGMA, channels_psf_xsigmas_nm=SIGMA, channels_psf_ysigmas_nm=SIGMA,
+    channels_psf_thetas_deg=0.0, channels_fit_thetas=False,
+    channels_psf_3d_xtangents=None, channels_psf_3d_ytangents=None, channels_psf_3d_ztangents=None,
     channels_psf_3d_spline_coeffs=None,
 ):
     """
@@ -164,116 +147,55 @@ def locs_individual_fit(
     >>> info["models"]
     ['spline']
     """
+    # Split origins by channel
     n_channels = len(crops)
     X0, Y0, positions = split_channel_origins(crops, X0, Y0, ch, cuda=cuda)
 
-    channels_fit_models = _normalize_channels_fit_models(
-        channels_fit_models,
-        n_channels,
-    )
-    channels_pixels_nm = _normalize_channels_pixels_nm(
-        channels_pixels_nm,
-        n_channels,
-    )
+    # Normalize per-channel parameters
+    channels_fit_models = _normalize_channels_fit_models(channels_fit_models, n_channels)
+    channels_pixels_nm = _normalize_channels_pixels_nm(channels_pixels_nm, n_channels)
     channels_gains = _normalize_channels_parameter(channels_gains, n_channels)
     channels_QE = _normalize_channels_parameter(channels_QE, n_channels)
-    channels_psf_sigmas_nm = _normalize_channels_parameter(
-        channels_psf_sigmas_nm,
-        n_channels,
-    )
-    channels_psf_xsigmas_nm = _normalize_channels_parameter(
-        channels_psf_xsigmas_nm,
-        n_channels,
-    )
-    channels_psf_ysigmas_nm = _normalize_channels_parameter(
-        channels_psf_ysigmas_nm,
-        n_channels,
-    )
-    channels_psf_thetas_deg = _normalize_channels_parameter(
-        channels_psf_thetas_deg,
-        n_channels,
-    )
+    channels_psf_sigmas_nm = _normalize_channels_parameter(channels_psf_sigmas_nm, n_channels)
+    channels_psf_xsigmas_nm = _normalize_channels_parameter(channels_psf_xsigmas_nm, n_channels)
+    channels_psf_ysigmas_nm = _normalize_channels_parameter(channels_psf_ysigmas_nm, n_channels)
+    channels_psf_thetas_deg = _normalize_channels_parameter(channels_psf_thetas_deg, n_channels)
     channels_fit_thetas = _normalize_channels_parameter(channels_fit_thetas, n_channels)
 
+    # Normalize spline parameters
     needs_spline = "spline" in channels_fit_models
     channels_psf_3d_xtangents = _normalize_spline_parameter(
-        channels_psf_3d_xtangents,
-        n_channels,
-        "channels_psf_3d_xtangents",
-        required=needs_spline,
+        channels_psf_3d_xtangents, n_channels, "channels_psf_3d_xtangents", required=needs_spline,
     )
     channels_psf_3d_ytangents = _normalize_spline_parameter(
-        channels_psf_3d_ytangents,
-        n_channels,
-        "channels_psf_3d_ytangents",
-        required=needs_spline,
+        channels_psf_3d_ytangents, n_channels, "channels_psf_3d_ytangents", required=needs_spline,
     )
     channels_psf_3d_ztangents = _normalize_spline_parameter(
-        channels_psf_3d_ztangents,
-        n_channels,
-        "channels_psf_3d_ztangents",
-        required=needs_spline,
+        channels_psf_3d_ztangents, n_channels, "channels_psf_3d_ztangents", required=needs_spline,
     )
     channels_psf_3d_spline_coeffs = _normalize_spline_parameter(
-        channels_psf_3d_spline_coeffs,
-        n_channels,
-        "channels_psf_3d_spline_coeffs",
-        required=needs_spline,
+        channels_psf_3d_spline_coeffs, n_channels, "channels_psf_3d_spline_coeffs", required=needs_spline,
     )
 
+    # Resolve optimizer and estimator
     optimizer_cls = _resolve_optimizer(optimizer)
     distribution = _resolve_distribution(distribution)
     estimator = _resolve_estimator(estimator, distribution)
-
     xp = get_xp(cuda)
-    mux_all = []
-    muy_all = []
-    amp_all = []
-    offset_all = []
-    sigma_all = []
-    sigmax_all = []
-    sigmay_all = []
-    muz_all = []
 
-    iterator = zip(
-        crops,
-        X0,
-        Y0,
-        channels_pixels_nm,
-        channels_gains,
-        channels_QE,
-        channels_fit_models,
-        channels_psf_sigmas_nm,
-        channels_psf_xsigmas_nm,
-        channels_psf_ysigmas_nm,
-        channels_psf_thetas_deg,
-        channels_fit_thetas,
-        channels_psf_3d_xtangents,
-        channels_psf_3d_ytangents,
-        channels_psf_3d_ztangents,
+    # Initialize output containers
+    mux_all, muy_all, amp_all, offset_all = [], [], [], []
+    sigma_all, sigmax_all, sigmay_all, muz_all = [], [], [], []
+
+    # Iterate over channels
+    for crop, x0, y0, pixel, gain, qe, model, sigma, sigx, sigy, theta, fit_theta, tx, ty, tz, coeffs in zip(
+        crops, X0, Y0, channels_pixels_nm, channels_gains, channels_QE, channels_fit_models,
+        channels_psf_sigmas_nm, channels_psf_xsigmas_nm, channels_psf_ysigmas_nm, channels_psf_thetas_deg,
+        channels_fit_thetas, channels_psf_3d_xtangents, channels_psf_3d_ytangents, channels_psf_3d_ztangents,
         channels_psf_3d_spline_coeffs,
-    )
+    ):
 
-    for values in iterator:
-        (
-            crop,
-            x0,
-            y0,
-            pixel,
-            gain,
-            qe,
-            model,
-            sigma,
-            sigx,
-            sigy,
-            theta,
-            fit_theta,
-            tx,
-            ty,
-            tz,
-            coeffs,
-        ) = values
-
+        # Prepare input arrays and initial guesses
         crop = xp.asarray(crop)
         _, height, width = crop.shape
         yy, xx = coordinates(shape=(height, width), pixel=pixel, cuda=cuda)
@@ -281,6 +203,7 @@ def locs_individual_fit(
         x0 = xp.asarray(x0) * pixel[1]
         y0 = xp.asarray(y0) * pixel[0]
 
+        # Handle empty crops
         if len(crop) == 0:
             empty = xp.empty(0, dtype=xp.float32)
             mux_all.append(empty)
@@ -293,30 +216,20 @@ def locs_individual_fit(
             sigmay_all.append(empty)
             continue
 
+        # Initialize fit parameters
         mux = xp.full_like(x0, fill_value=(width - 1) / 2 * pixel[1])
         muy = xp.full_like(y0, fill_value=(height - 1) / 2 * pixel[0])
         amp = xp.max(crop, axis=(1, 2))
         offset = xp.min(crop, axis=(1, 2))
 
+        # Create model and run optimizer
         function = _make_model(
-            model=model,
-            mux=mux,
-            muy=muy,
-            amp=amp,
-            offset=offset,
-            pixel=pixel,
-            sigma=sigma,
-            sigx=sigx,
-            sigy=sigy,
-            theta=theta,
-            fit_theta=fit_theta,
-            tx=tx,
-            ty=ty,
-            tz=tz,
-            coeffs=coeffs,
-            cuda=cuda,
+            model=model, mux=mux, muy=muy, amp=amp, offset=offset,
+            pixel=pixel, sigma=sigma, sigx=sigx, sigy=sigy, theta=theta, fit_theta=fit_theta,
+            tx=tx, ty=ty, tz=tz, coeffs=coeffs, cuda=cuda,
         )
 
+        # Run optimizer and collect results
         fit = optimizer_cls(function, estimator)
         if model == "spline":
             zz = xp.zeros_like(xx)
@@ -334,6 +247,7 @@ def locs_individual_fit(
                     fit(crop, xx, yy)
             muz = xp.full_like(x0, fill_value=np.nan, dtype=xp.float32)
 
+        # Transform to global coordinates and apply gains
         mux = function.mux + x0
         muy = function.muy + y0
         amp = function.amp / qe * gain
@@ -352,6 +266,7 @@ def locs_individual_fit(
         amp_all.append(amp)
         offset_all.append(offset)
 
+        # Compute sigma values per model
         nan_sigma = xp.full_like(x0, fill_value=np.nan, dtype=xp.float32)
         if model == "isogauss":
             sig = function.sig
@@ -374,6 +289,7 @@ def locs_individual_fit(
         sigmax_all.append(sigx)
         sigmay_all.append(sigy)
 
+    # Pack results
     info = {
         "amp": stack_channel_values(amp_all, positions),
         "offset": stack_channel_values(offset_all, positions),
@@ -490,64 +406,14 @@ def _resolve_estimator(estimator, distribution):
 
 
 
-def _make_model(
-    *,
-    model,
-    mux,
-    muy,
-    amp,
-    offset,
-    pixel,
-    sigma,
-    sigx,
-    sigy,
-    theta,
-    fit_theta,
-    tx,
-    ty,
-    tz,
-    coeffs,
-    cuda,
-):
+def _make_model(*, model, mux, muy, amp, offset, pixel, sigma, sigx, sigy, theta, fit_theta, tx, ty, tz, coeffs, cuda):
     """Instantiate the fit model selected for one channel."""
     if model == "isogauss":
-        return IsoGaussian(
-            mux=mux,
-            muy=muy,
-            amp=amp,
-            offset=offset,
-            sig=sigma,
-            pixx=pixel[1],
-            pixy=pixel[0],
-            cuda=cuda,
-        )
+        return IsoGaussian(mux=mux, muy=muy, amp=amp, offset=offset, sig=sigma, pixx=pixel[1], pixy=pixel[0], cuda=cuda)
     if model == "gauss":
-        return Gaussian2D(
-            mux=mux,
-            muy=muy,
-            amp=amp,
-            offset=offset,
-            sigx=sigx,
-            sigy=sigy,
-            theta=theta,
-            theta_fit=fit_theta,
-            pixx=pixel[1],
-            pixy=pixel[0],
-            cuda=cuda,
-        )
+        return Gaussian2D(mux=mux, muy=muy, amp=amp, offset=offset, sigx=sigx, sigy=sigy, theta=theta, theta_fit=fit_theta, pixx=pixel[1], pixy=pixel[0], cuda=cuda)
     if model == "spline":
-        return Spline3D(
-            mux=mux,
-            muy=muy,
-            muz=mux * 0,
-            amp=amp,
-            offset=offset,
-            tx=tx,
-            ty=ty,
-            tz=tz,
-            coeffs=coeffs,
-            cuda=cuda,
-        )
+        return Spline3D(mux=mux, muy=muy, muz=mux * 0, amp=amp, offset=offset, tx=tx, ty=ty, tz=tz, coeffs=coeffs, cuda=cuda)
 
     raise ValueError(f"Unknown model: {model}")
 
