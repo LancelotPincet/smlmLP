@@ -52,7 +52,7 @@ class Channel:
         ("psf_3d_spline_coeffs", "Data"),
         ("fit_theta", "Localizations"),
         ("fit_model", "Localizations"),
-        ("weighted_integrations", "Integrations")
+        ("weighted_integrations", "Integrations"),
         ("x_shift_nm", "Registration"),
         ("y_shift_nm", "Registration"),
         ("rotation_deg", "Registration"),

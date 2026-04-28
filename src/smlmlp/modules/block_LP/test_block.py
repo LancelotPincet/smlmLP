@@ -223,16 +223,23 @@ def test_load_data(tmp_path):
 def test_load_data_reserves_resource_tokens_and_limits_chunk(tmp_path, monkeypatch):
     import importlib
 
-    load_data_module = importlib.import_module(
-        "smlmlp.modules.block_LP._functions.loading.load_data"
-    )
+    load_data_module = importlib.import_module("smlmlp.modules.block_LP._functions.loading.load_data")
+    load_chunking_module = importlib.import_module("smlmlp.modules.block_LP._functions.loading.load_chunking")
 
     class _FakeResource:
-        def __init__(self, granted_tokens, reservation_id):
+        def __init__(self, granted_tokens, reservation_id, total_gb=1000, free_gb=1000):
             self.granted_tokens = granted_tokens
             self.reservation_id = reservation_id
+            self.total_gb = total_gb
+            self.free_gb = free_gb
             self.takes = []
             self.releases = []
+
+        def total(self):
+            return self.total_gb
+
+        def free(self):
+            return self.free_gb
 
         def take(self, value, owner, minimum=None, **kwargs):
             token = {
@@ -259,17 +266,18 @@ def test_load_data_reserves_resource_tokens_and_limits_chunk(tmp_path, monkeypat
     granted_chunk = 3
     pad = 1
     frame_size_gb = 4 * 4 * np.dtype(np.float32).itemsize / 1024**3
-    ram_factor = load_data_module._MEMORY_COPY_FACTOR + 1
-    vram_factor = load_data_module._MEMORY_COPY_FACTOR
-    ram_requested = (requested_chunk + 2 * pad) * frame_size_gb * ram_factor
-    vram_requested = (requested_chunk + 2 * pad) * frame_size_gb * vram_factor
-    vram_granted = (granted_chunk + 2 * pad) * frame_size_gb * vram_factor
 
-    fake_ram = _FakeResource(ram_requested, "ram-token")
-    fake_vram = _FakeResource(vram_granted, "vram-token")
+    fake_ram = _FakeResource(0, "ram-token")
+    fake_vram = _FakeResource(0, "vram-token")
     monkeypatch.setattr(load_data_module.computer, "ram", fake_ram)
     monkeypatch.setattr(load_data_module.computer, "vram", fake_vram)
     monkeypatch.setattr(load_data_module.computer, "gpu", _FakeGPU())
+    _, ram_requested, vram_requested, ram_min, vram_min, _ = load_chunking_module.load_chunking(
+        [frame_size_gb], chunks=requested_chunk, pad=pad, cuda=True)
+    _, _, vram_granted, _, _, _ = load_chunking_module.load_chunking(
+        [frame_size_gb], chunks=granted_chunk, pad=pad, cuda=True)
+    fake_ram.granted_tokens = ram_requested
+    fake_vram.granted_tokens = vram_granted
 
     chunks = list(
         load_data_module.load_data(
@@ -287,14 +295,8 @@ def test_load_data_reserves_resource_tokens_and_limits_chunk(tmp_path, monkeypat
     assert info["chunk"] == granted_chunk
     np.testing.assert_allclose(info["ram_tokens_requested"], ram_requested)
     np.testing.assert_allclose(info["vram_tokens_requested"], vram_requested)
-    np.testing.assert_allclose(
-        info["ram_tokens_minimum"],
-        (1 + 2 * pad) * frame_size_gb * ram_factor,
-    )
-    np.testing.assert_allclose(
-        info["vram_tokens_minimum"],
-        (1 + 2 * pad) * frame_size_gb * vram_factor,
-    )
+    np.testing.assert_allclose(info["ram_tokens_minimum"], ram_min)
+    np.testing.assert_allclose(info["vram_tokens_minimum"], vram_min)
     assert fake_ram.takes[0]["owner"] == "load_data:ram"
     assert fake_vram.takes[0]["owner"] == "load_data:vram"
     assert fake_ram.releases[0]["reservation_id"] == "ram-token"
@@ -305,15 +307,18 @@ def test_load_data_reserves_resource_tokens_and_limits_chunk(tmp_path, monkeypat
 
 
 def test_load_chunking(tmp_path):
-    from smlmlp.modules.block_LP._functions.loading.load_chunking import load_chunking
+    from smlmlp import load_chunking
 
-    path = tmp_path / "ROI.tif"
-    tiff.imwrite(path, np.zeros((20, 32, 32), dtype=np.uint16))
+    chunks, ram, vram, ram_min, vram_min, info = load_chunking([0.001], chunks=6, pad=1)
+    chunks3, ram3, _, _, _, _ = load_chunking([0.001], chunks=3, pad=1)
+    chunks_recalculated, _, _, _, _, _ = load_chunking([0.001], chunks=6, pad=1, ram_tokens=ram3)
 
-    loaded_max, info = load_chunking(str(path), cuda=False, parallel=False)
-
-    assert loaded_max >= 0
-    assert "loaded_max_cpu" in info
+    assert chunks == 6
+    assert chunks3 == 3
+    assert chunks_recalculated == 3
+    assert ram >= ram_min
+    assert vram >= vram_min
+    assert "loaded_max_cpu_copy" in info
 
 
 # %% test detect_snr
