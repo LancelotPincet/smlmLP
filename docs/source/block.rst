@@ -81,6 +81,7 @@ Localization
    :maxdepth: 1
 
    locs_individual_barycenter
+   locs_individual_fit
    locs_individual_gaussfit
    locs_individual_isogaussfit
    locs_individual_splinefit
