@@ -113,11 +113,12 @@ class Camera:
     @property
     def gain(self):
         """Return effective gain, preferring experimental over constructor."""
-        return (
+        g = (
             self.experimental_gain
-            if self.experimental_gain is not None
+            if self.experimental_gain is not None and self.experimental_gain > 0
             else self.constructor_gain
         )
+        return abs(g)
 
     @prop(dtype=float)
     def constructor_gain(self):
