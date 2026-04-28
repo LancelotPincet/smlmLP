@@ -13,7 +13,7 @@ from numba import cuda as nb_cuda
 
 
 
-@block()
+@block(timeit=False)
 def crop_remove_bkgd(crops, /, *, cuda=False, parallel=False):
     """
     Remove a per-crop background estimated from the border median.

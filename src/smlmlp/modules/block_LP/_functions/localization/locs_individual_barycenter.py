@@ -5,7 +5,7 @@
 
 
 
-from smlmlp import block
+from smlmlp import block, crop_remove_bkgd
 from arrlp import get_xp, nb_threads
 import numpy as np
 import numba as nb
@@ -101,7 +101,9 @@ def locs_individual_barycenter(
     mux_all = []
     muy_all = []
 
-    for crop, x0, y0, pixel in zip(crops, X0, Y0, channels_pixels_nm):
+    new_crops, _bkgd_info = crop_remove_bkgd(crops, cuda=cuda, parallel=parallel)
+
+    for crop, x0, y0, pixel in zip(new_crops, X0, Y0, channels_pixels_nm):
         crop = xp.asarray(crop)
         x0 = xp.asarray(x0)
         y0 = xp.asarray(y0)
