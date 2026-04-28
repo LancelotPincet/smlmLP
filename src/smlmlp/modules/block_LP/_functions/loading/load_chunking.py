@@ -144,9 +144,9 @@ def load_chunking(channels_frames_sizes_gb, /, chunks=None, pad=0, *,
     vram_copy_frame_gb = frame_sizes_gb * _MEMORY_COPY_FACTOR
     autocorr_fixed_gb = max_frame_sizes_gb * _MEMORY_AUTOCORR_FACTOR
     loaded_max_cpu_copy = np.floor((ram_limit_gb - ram_copy_fixed_gb) / ram_copy_frame_gb) - 2 * pad
-    loaded_max_cpu_autocorr = np.floor((ram_limit_gb - autocorr_fixed_gb) / frame_sizes_gb) - 2 * pad
+    loaded_max_cpu_autocorr = np.floor(ram_limit_gb / (frame_sizes_gb + autocorr_fixed_gb)) - 2 * pad
     loaded_max_gpu_copy = np.floor(vram_limit_gb / vram_copy_frame_gb) - 2 * pad if cuda else np.inf
-    loaded_max_gpu_autocorr = np.floor((vram_limit_gb - autocorr_fixed_gb) / frame_sizes_gb) - 2 * pad if cuda else np.inf
+    loaded_max_gpu_autocorr = np.floor(vram_limit_gb / (frame_sizes_gb + autocorr_fixed_gb)) - 2 * pad if cuda else np.inf
     loaded_max = min(loaded_max_cpu_copy, loaded_max_gpu_copy, loaded_max_cpu_autocorr, loaded_max_gpu_autocorr)
 
     # Resolve final chunk size
@@ -160,15 +160,15 @@ def load_chunking(channels_frames_sizes_gb, /, chunks=None, pad=0, *,
     loaded_frames = chunks + 2 * pad
     ram_cpu_copy = ram_copy_fixed_gb + ram_copy_frame_gb * loaded_frames
     vram_cpu_copy = vram_copy_frame_gb * loaded_frames
-    ram_cpu_autocorr = frame_sizes_gb * loaded_frames + autocorr_fixed_gb
-    vram_cpu_autocorr = frame_sizes_gb * loaded_frames + autocorr_fixed_gb
+    ram_cpu_autocorr = (frame_sizes_gb + autocorr_fixed_gb) * loaded_frames
+    vram_cpu_autocorr = (frame_sizes_gb + autocorr_fixed_gb) * loaded_frames
 
     # Estimate minimum tokens for one frame
     loaded_frames_min = 1 + 2 * pad
     ram_cpu_copy_min = ram_copy_fixed_gb + ram_copy_frame_gb * loaded_frames_min
     vram_cpu_copy_min = vram_copy_frame_gb * loaded_frames_min
-    ram_cpu_autocorr_min = frame_sizes_gb * loaded_frames_min + autocorr_fixed_gb
-    vram_cpu_autocorr_min = frame_sizes_gb * loaded_frames_min + autocorr_fixed_gb
+    ram_cpu_autocorr_min = (frame_sizes_gb + autocorr_fixed_gb) * loaded_frames_min
+    vram_cpu_autocorr_min = (frame_sizes_gb + autocorr_fixed_gb) * loaded_frames_min
 
     # Pack result
     ram = max(ram_cpu_copy, ram_cpu_autocorr)
