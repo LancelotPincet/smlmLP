@@ -208,7 +208,13 @@ class detections(MainDataFrame) :
         if heights.size == 0 or widths.size == 0:
             return None
 
-        ch = np.asarray(self.ch, dtype=np.int32)
+        ch_values = self.ch
+        if ch_values is None:
+            if getattr(self.locs.config, "nchannels", 1) != 1:
+                return None
+            ch = np.ones(len(self), dtype=np.int32)
+        else:
+            ch = np.asarray(ch_values, dtype=np.int32)
         valid = np.isfinite(self.x_det) & np.isfinite(self.y_det)
         valid &= np.isfinite(self.x_cropshape) & np.isfinite(self.y_cropshape)
         valid &= np.isfinite(self.x_pixel) & np.isfinite(self.y_pixel)
