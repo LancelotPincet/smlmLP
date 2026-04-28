@@ -24,6 +24,7 @@ def locs_individual_barycenter(
     /,
     ch=None,
     *,
+    remove_bkgd = True,
     channels_pixels_nm=1.0,
     cuda=False,
     parallel=False,
@@ -72,8 +73,8 @@ def locs_individual_barycenter(
     -----
     1. ``ch`` is converted into per-channel positions and used to split ``X0``
        and ``Y0`` so each origin vector matches the corresponding crop stack.
-    2. Each crop barycenter is computed in local pixel coordinates; zero-sum
-       crops fall back to the crop center.
+    2. Each crop barycenter is computed in local pixel coordinates; non-positive
+       intensity sums are marked invalid with NaN coordinates.
     3. Local barycenters are shifted by the crop origins, converted to
        nanometers with the channel pixel size, and remapped to detection order.
 
@@ -101,7 +102,10 @@ def locs_individual_barycenter(
     mux_all = []
     muy_all = []
 
-    new_crops, _bkgd_info = crop_remove_bkgd(crops, cuda=cuda, parallel=parallel)
+    if remove_bkgd :
+        new_crops, bkgd_info = crop_remove_bkgd(crops, cuda=cuda, parallel=parallel)
+    else :
+        new_crops, bkgd_info = crops, {}
 
     for crop, x0, y0, pixel in zip(new_crops, X0, Y0, channels_pixels_nm):
         crop = xp.asarray(crop)
@@ -142,6 +146,7 @@ def locs_individual_barycenter(
     info = {
         "channels_pixels_nm": channels_pixels_nm,
     }
+    info.update(bkgd_info)
 
     return stack_channel_values(mux_all, positions), stack_channel_values(muy_all, positions), info
 
@@ -198,8 +203,8 @@ def barycenter_cpu(crop, mux, muy):
             mux[i] = xnum / denom
             muy[i] = ynum / denom
         else:
-            mux[i] = (width - 1) / 2
-            muy[i] = (height - 1) / 2
+            mux[i] = np.nan
+            muy[i] = np.nan
 
 
 
@@ -248,5 +253,5 @@ def barycenter_gpu(crop, mux, muy):
             mux[i] = xnum_cache[0] / denom
             muy[i] = ynum_cache[0] / denom
         else:
-            mux[i] = (width - 1) / 2.0
-            muy[i] = (height - 1) / 2.0
+            mux[i] = np.nan
+            muy[i] = np.nan

@@ -86,25 +86,29 @@ def crop_remove_bkgd(crops, /, *, cuda=False, parallel=False):
     for crop in crops:
         crop = xp.asarray(crop)
         n_crops, height, width = crop.shape
+        pad_mask = edge_connected_zero_mask(crop == 0, xp)
 
         # Store the crop border values without duplicating the four corners.
         borders = xp.empty_like(
             crop,
             shape=(n_crops, (height - 1 + width - 1) * 2),
+            dtype=xp.float32,
         )
 
         if cuda:
             threads_per_block = 128
             blocks_per_grid = n_crops
 
-            borders_gpu[blocks_per_grid, threads_per_block](crop, borders)
-            med = xp.median(borders, axis=1)
-            crop = crop - med[:, None, None]
+            borders_gpu[blocks_per_grid, threads_per_block](crop, pad_mask, borders)
+            med = xp.nanmedian(borders, axis=1)
         else:
             with nb_threads(parallel):
-                borders_cpu(crop, borders)
-            med = bn.median(borders, axis=1)
-            crop = crop - med[:, None, None]
+                borders_cpu(crop, pad_mask, borders)
+            med = bn.nanmedian(borders, axis=1)
+
+        med = xp.where(xp.isnan(med), xp.float32(0.0), med)
+        crop = crop - med[:, None, None]
+        crop = xp.where(pad_mask, xp.float32(0.0), crop)
 
         new_crops.append(crop)
         border_medians.append(med)
@@ -117,32 +121,61 @@ def crop_remove_bkgd(crops, /, *, cuda=False, parallel=False):
 
 
 
-@nb.njit(fastmath=True, cache=True, nogil=True, parallel=True)
-def borders_cpu(crop, borders):
-    """Fill the border buffer for each crop on CPU."""
+def edge_connected_zero_mask(zero_mask, xp):
+    """Return the mask of zero pixels connected to crop borders."""
+    _, height, width = zero_mask.shape
+
+    pad_mask = xp.zeros_like(zero_mask, dtype=bool)
+    pad_mask[:, 0, :] = zero_mask[:, 0, :]
+    pad_mask[:, -1, :] = zero_mask[:, -1, :]
+    pad_mask[:, :, 0] = zero_mask[:, :, 0]
+    pad_mask[:, :, -1] = zero_mask[:, :, -1]
+
+    for _ in range(height + width):
+        neighbors = xp.zeros_like(pad_mask, dtype=bool)
+        neighbors[:, 1:, :] |= pad_mask[:, :-1, :]
+        neighbors[:, :-1, :] |= pad_mask[:, 1:, :]
+        neighbors[:, :, 1:] |= pad_mask[:, :, :-1]
+        neighbors[:, :, :-1] |= pad_mask[:, :, 1:]
+        pad_mask = pad_mask | (zero_mask & neighbors)
+
+    return pad_mask
+
+
+
+@nb.njit(cache=True, nogil=True, parallel=True)
+def borders_cpu(crop, pad_mask, borders):
+    """Fill the border buffer for each crop on CPU, masking padded border pixels."""
     n_crops, height, width = crop.shape
 
     for i in nb.prange(n_crops):
-        cr = crop[i]
         i1 = 0
 
-        i0, i1 = i1, i1 + height - 1
-        borders[i, i0:i1] = cr[:-1, 0]
+        for y in range(height - 1):
+            v = crop[i, y, 0]
+            borders[i, i1] = float("nan") if pad_mask[i, y, 0] else v
+            i1 += 1
 
-        i0, i1 = i1, i1 + width - 1
-        borders[i, i0:i1] = cr[-1, :-1]
+        for x in range(width - 1):
+            v = crop[i, height - 1, x]
+            borders[i, i1] = float("nan") if pad_mask[i, height - 1, x] else v
+            i1 += 1
 
-        i0, i1 = i1, i1 + height - 1
-        borders[i, i0:i1] = cr[1:, -1]
+        for y in range(1, height):
+            v = crop[i, y, width - 1]
+            borders[i, i1] = float("nan") if pad_mask[i, y, width - 1] else v
+            i1 += 1
 
-        i0, i1 = i1, i1 + width - 1
-        borders[i, i0:i1] = cr[0, 1:]
+        for x in range(1, width):
+            v = crop[i, 0, x]
+            borders[i, i1] = float("nan") if pad_mask[i, 0, x] else v
+            i1 += 1
 
 
 
-@nb_cuda.jit(fastmath=True, cache=True)
-def borders_gpu(crop, borders):
-    """Fill the border buffer for each crop on GPU."""
+@nb_cuda.jit(cache=True)
+def borders_gpu(crop, pad_mask, borders):
+    """Fill the border buffer for each crop on GPU, masking padded border pixels."""
     i = nb_cuda.blockIdx.x
     t = nb_cuda.threadIdx.x
     bdim = nb_cuda.blockDim.x
@@ -162,16 +195,26 @@ def borders_gpu(crop, borders):
 
     for k in range(t, total, bdim):
         if k < n_left:
-            borders[i, k] = crop[i, k, 0]
+            v = crop[i, k, 0]
+            yb = k
+            xb = 0
 
         elif k < n_left + n_bottom:
             kk = k - n_left
-            borders[i, k] = crop[i, height - 1, kk]
+            v = crop[i, height - 1, kk]
+            yb = height - 1
+            xb = kk
 
         elif k < n_left + n_bottom + n_right:
             kk = k - (n_left + n_bottom)
-            borders[i, k] = crop[i, kk + 1, width - 1]
+            v = crop[i, kk + 1, width - 1]
+            yb = kk + 1
+            xb = width - 1
 
         else:
             kk = k - (n_left + n_bottom + n_right)
-            borders[i, k] = crop[i, 0, kk + 1]
+            v = crop[i, 0, kk + 1]
+            yb = 0
+            xb = kk + 1
+
+        borders[i, k] = float("nan") if pad_mask[i, yb, xb] else v
