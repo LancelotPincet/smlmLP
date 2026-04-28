@@ -86,7 +86,7 @@ def detect_spatial_maxima(
         \\exp\\left(-\\frac{(0.47 / 0.21)^2}{2}\\right)
 
     On CPU, local maxima are first detected on the integer grid and then
-    refined with a 3x3 center-of-mass estimate. On GPU, both operations are
+    refined with a 5x5 center-of-mass estimate. On GPU, both operations are
     combined in a single kernel.
 
     Examples
@@ -261,7 +261,7 @@ def maxi_cpu(mask, snr, snr_thresh, footprint):
 
 @nb.njit(parallel=True, nogil=True, cache=True, fastmath=True)
 def com_cpu(snr, fr_idx, y_idx, x_idx, y_out, x_out):
-    """Refine detected maxima with a 3x3 center of mass on CPU."""
+    """Refine detected maxima with a 5x5 center of mass on CPU."""
     n = len(fr_idx)
     _, height, width = snr.shape
 
@@ -274,8 +274,8 @@ def com_cpu(snr, fr_idx, y_idx, x_idx, y_out, x_out):
         ynum = 0.0
         denom = 0.0
 
-        for dy in range(-1, 2):
-            for dx in range(-1, 2):
+        for dy in range(-2, 3):
+            for dx in range(-2, 3):
                 ny = y + dy
                 nx = x + dx
 
@@ -338,13 +338,13 @@ def det_gpu(snr, snr_thresh, footprint, fr_out, y_out, x_out, counter):
     if not is_max:
         return
 
-    # 3x3 center-of-mass refinement.
+    # 5x5 center-of-mass refinement.
     xnum = 0.0
     ynum = 0.0
     denom = 0.0
 
-    for dy in range(-1, 2):
-        for dx in range(-1, 2):
+    for dy in range(-2, 3):
+        for dx in range(-2, 3):
             ny = y + dy
             nx = x + dx
 
