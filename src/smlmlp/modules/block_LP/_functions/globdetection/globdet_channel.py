@@ -13,7 +13,7 @@ import numpy as np
 def globdet_channel(
     channels,
     /,
-    mode="mean",
+    globdet_mode="mean",
     channels_x_shifts_nm=None,
     channels_y_shifts_nm=None,
     channels_rotations_deg=None,
@@ -37,7 +37,7 @@ def globdet_channel(
     ----------
     channels : sequence of ndarray
         Input channel stacks.
-    mode : {"mean", "std"}, optional
+    globdet_mode : {"mean", "std"}, optional
         Aggregation used to merge transformed channels.
     channels_x_shifts_nm, channels_y_shifts_nm : sequence of float or None, optional
         Per-channel translations in nanometers. If ``None``, zeros are used.
@@ -173,13 +173,13 @@ def globdet_channel(
         "channels_y_shears",
     )
 
-    match mode:
+    match globdet_mode:
         case "mean":
             agg_func = xp.mean
         case "std":
             agg_func = xp.std
         case _:
-            raise SyntaxError(f"Aggregation mode {mode} is not recognized")
+            raise SyntaxError(f"Aggregation globdet_mode {mode} is not recognized")
 
     transformed = []
     valid_masks = []

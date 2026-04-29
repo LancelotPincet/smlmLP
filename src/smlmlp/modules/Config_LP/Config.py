@@ -402,6 +402,20 @@ class Config() :
         self._distribution = value.lower()
 
 
+    # Globdet
+
+    @metadatum('Globdetections')
+    def globdet_mode(self) : # string
+        """Return globdet mode."""
+        return "mean"
+    @globdet_mode.setter
+    def globdet_mode(self, value) :
+        """Set globdet mode."""
+        assert type(value) is str
+        assert value.lower() in ["mean", "std"]
+        self._globdet_mode = value.lower()
+
+
 
     # Effective values
 
