@@ -98,6 +98,7 @@ Registration
    registrate_pcc_shift
    registrate_solve_redundant_affine
    registrate_solve_redundant_shift
+   registrate_transform
 
 Signal
 ------

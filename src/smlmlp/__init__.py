@@ -69,6 +69,7 @@ sources = {
 'image_stackmap': 'smlmlp.modules.analysis_LP._functions.image.image_stackmap',
 'globloc_fit': 'smlmlp.modules.block_LP._functions.globlocalization.globloc_fit',
 'registrate_pcc_shift': 'smlmlp.modules.block_LP._functions.registration.registrate_pcc_shift',
+'registrate_transform': 'smlmlp.modules.block_LP._functions.registration.registrate_transform',
 'registrate_solve_redundant_shift': 'smlmlp.modules.block_LP._functions.registration.registrate_solve_redundant_shift',
 'registrate_ecc_affine': 'smlmlp.modules.block_LP._functions.registration.registrate_ecc_affine',
 'registrate_optimize_images': 'smlmlp.modules.block_LP._functions.registration.registrate_optimize_images',
